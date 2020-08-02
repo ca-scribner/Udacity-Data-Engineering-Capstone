@@ -1,7 +1,8 @@
 import psycopg2
 import configparser
 
-from sql_postgres import create_staging_table_queries, create_table_queries
+from sql_postgres import create_staging_table_queries, create_table_queries, drop_olap_table_queries, \
+    create_olap_table_queries
 from sql_postgres import drop_staging_table_queries, drop_table_queries
 
 
@@ -17,8 +18,12 @@ def drop_tables(engine):
     for name, q in drop_staging_table_queries.items():
         print(f"\tDropping {name}")
         cur.execute(q)
-    
+
     for name, q in drop_table_queries.items():
+        print(f"\tDropping {name}")
+        cur.execute(q)
+
+    for name, q in drop_olap_table_queries.items():
         print(f"\tDropping {name}")
         cur.execute(q)
     engine.commit()
@@ -36,8 +41,12 @@ def create_tables(engine):
     for name, q in create_staging_table_queries.items():
         print(f"\tCreating {name}")
         cur.execute(q)
-    
+
     for name, q in create_table_queries.items():
+        print(f"\tCreating {name}")
+        cur.execute(q)
+
+    for name, q in create_olap_table_queries.items():
         print(f"\tCreating {name}")
         cur.execute(q)
     engine.commit()

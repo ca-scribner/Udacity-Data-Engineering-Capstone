@@ -101,8 +101,6 @@ def insert_check_tables(engine):
     print("Loading and checking production tables")
 
     for table_name, q in insert_table_queries.items():
-        print(f"\tLoading table {table_name}")
-        print(q)
         load_check_table(engine, table_name, q)
 
 

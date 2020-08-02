@@ -7,6 +7,7 @@ product_categories = "product_categories"
 stores = "stores"
 weather = "weather"
 weather_stations = "weather_stations"
+olap_sales_weather = "fact_weather_sales"
 
 count_rows = """
 SELECT COUNT(*) from {table_name};
@@ -22,6 +23,8 @@ drop_product_categories = drop.format(table_name=product_categories)
 drop_stores = drop.format(table_name=stores)
 drop_weather = drop.format(table_name=weather)
 drop_weather_stations = drop.format(table_name=weather_stations)
+
+drop_olap_sales_weather = drop.format(table_name=olap_sales_weather)
 
 drop_staging_sales = drop.format(table_name=staging_sales)
 drop_staging_weather = drop.format(table_name=staging_weather)
@@ -74,13 +77,15 @@ create_invoices = f"""
 CREATE TABLE {invoices} (
   invoice_id VARCHAR(16) NOT NULL, 
   store_id VARCHAR(4) NOT NULL, 
+  item_id VARCHAR(6) NOT NULL, 
   date DATE NOT NULL, 
   bottle_cost DECIMAL(7,3) NOT NULL, 
   bottle_retail DECIMAL(7,3) NOT NULL, 
   bottles_sold SMALLINT NOT NULL, 
   total_sale DECIMAL(8,3) NOT NULL,
   PRIMARY KEY (invoice_id),
-  FOREIGN KEY (store_id) REFERENCES {stores}
+  FOREIGN KEY (store_id) REFERENCES {stores},
+  FOREIGN KEY (item_id) REFERENCES {items}
 );
 """
 
@@ -117,7 +122,7 @@ create_weather = f"""
 CREATE TABLE {weather} (
   station_id VARCHAR(11) NOT NULL, 
   date DATE NOT NULL, 
-  precpitation DECIMAL(5, 3),
+  precipitation DECIMAL(5, 3),
   snowfall DECIMAL(5, 3),
   temperature_max INTEGER, 
   temperature_min INTEGER,
@@ -135,6 +140,21 @@ CREATE TABLE {weather_stations} (
   zip VARCHAR(5),
   PRIMARY KEY (station_id)
 );
+"""
+
+create_olap_sales_weather = f"""
+CREATE TABLE {olap_sales_weather} (
+  invoice_id VARCHAR(16) NOT NULL, 
+  date DATE NOT NULL, 
+  category_id VARCHAR(7) NOT NULL, 
+  store_id VARCHAR(4) NOT NULL, 
+  total_sale DECIMAL(8,3) NOT NULL,
+  precipitation DECIMAL(5, 3),
+  snowfall DECIMAL(5, 3),
+  PRIMARY KEY (invoice_id),
+  FOREIGN KEY (category_id) REFERENCES {product_categories},
+  FOREIGN KEY (store_id) REFERENCES {stores}
+)
 """
 
 load_staging = """
@@ -155,6 +175,7 @@ INSERT INTO {invoices} (
     SELECT
         DISTINCT ON (invoice_id) invoice_id,
         store_id,
+        item_id,
         date,
         bottle_cost,
         bottle_retail,
@@ -228,6 +249,40 @@ INSERT INTO {weather_stations} (
 );
 """
 
+insert_olap_sales_weather = f"""
+INSERT INTO {olap_sales_weather} (
+    SELECT 
+        t.invoice_id as invoice_id,
+        t.date as date,
+        t.category_id as category_id,
+        t.store_id as store_id,
+        t.total_sale as total_sale,
+        t.precipitation as precipitation,
+        t.snowfall as snowfall
+    FROM (
+        SELECT 
+            inv.invoice_id,
+            inv.date,
+            it.category_id,
+            s.store_id,
+            inv.total_sale,
+            w.precipitation,
+            w.snowfall,
+            row_number() over (partition by ws.zip, inv.invoice_id
+                               order by ws.station_id) as rn
+        FROM invoices inv
+        JOIN stores s ON (s.store_id = inv.store_id)
+        JOIN items it ON (it.item_id = inv.item_id)
+        JOIN product_categories pc ON (pc.category_id = it.category_id)
+        JOIN weather_stations ws ON (ws.zip = s.zip)
+        JOIN weather w ON w.station_id = ws.station_id AND w.date = inv.date
+        ORDER BY ws.zip, ws.station_id, inv.invoice_id
+    ) t
+    WHERE rn = 1
+    ORDER BY t.invoice_id
+);
+"""
+
 create_staging_table_queries = {
     staging_sales: create_staging_sales,
     staging_weather: create_staging_weather,
@@ -240,6 +295,10 @@ create_table_queries = {
     invoices: create_invoices,
     weather_stations: create_weather_stations,
     weather: create_weather,
+}
+
+create_olap_table_queries = {
+    olap_sales_weather: create_olap_sales_weather,
 }
 
 drop_staging_table_queries = {
@@ -256,6 +315,10 @@ drop_table_queries = {
     weather_stations: drop_weather_stations,
 }
 
+drop_olap_table_queries = {
+    olap_sales_weather: drop_olap_sales_weather,
+}
+
 load_staging_queries = {
     staging_sales: load_staging_sales,
     staging_weather: load_staging_weather,
@@ -269,6 +332,9 @@ insert_table_queries = {
     weather: insert_weather,
 }
 
+insert_olap_table_queries = {
+    olap_sales_weather: insert_olap_sales_weather,
+}
 
 # Other queries
 get_station_latitude_longitude = f"""
