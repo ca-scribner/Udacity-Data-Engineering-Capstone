@@ -10,11 +10,11 @@ weather_stations = "weather_stations"
 olap_sales_weather = "fact_weather_sales"
 
 count_rows = """
-SELECT COUNT(*) from {table_name};
+SELECT COUNT(*) from {table_name}
 """
 
 drop = """
-DROP TABLE IF EXISTS {table_name};
+DROP TABLE IF EXISTS {table_name}
 """
 
 drop_invoices = drop.format(table_name=invoices)
@@ -55,7 +55,7 @@ CREATE TABLE {staging_sales} (
   total_sale DECIMAL NOT NULL, 
   volume_sold_liters DECIMAL NOT NULL, 
   volume_sold_gallons DECIMAL NOT NULL
-);
+)
 """
 
 create_staging_weather = f"""
@@ -70,7 +70,7 @@ CREATE TABLE {staging_weather} (
   "snowfall" VARCHAR, 
   "temperature_max" VARCHAR, 
   "temperature_min" VARCHAR
-);
+)
 """
 
 create_invoices = f"""
@@ -86,7 +86,7 @@ CREATE TABLE {invoices} (
   PRIMARY KEY (invoice_id),
   FOREIGN KEY (store_id) REFERENCES {stores},
   FOREIGN KEY (item_id) REFERENCES {items}
-);
+)
 """
 
 create_stores = f"""
@@ -96,7 +96,7 @@ CREATE TABLE {stores} (
   zip VARCHAR(5) NOT NULL, 
   store_location VARCHAR,
   PRIMARY KEY (store_id)
-);
+)
 """
 
 create_items = f"""
@@ -107,7 +107,7 @@ CREATE TABLE {items} (
   vendor_id VARCHAR(3) NOT NULL,
   PRIMARY KEY (item_id),
   FOREIGN KEY (category_id) REFERENCES {product_categories}
-);
+)
 """
 
 create_product_categories = f"""
@@ -115,7 +115,7 @@ CREATE TABLE {product_categories} (
   category_id VARCHAR(7) NOT NULL, 
   category_name VARCHAR(50),
   PRIMARY KEY (category_id)
-);
+)
 """
 
 create_weather = f"""
@@ -128,7 +128,7 @@ CREATE TABLE {weather} (
   temperature_min INTEGER,
   PRIMARY KEY (station_id, date),
   FOREIGN KEY (station_id) REFERENCES {weather_stations}
-);
+)
 """
 
 create_weather_stations = f"""
@@ -139,7 +139,7 @@ CREATE TABLE {weather_stations} (
   longitude VARCHAR(17) NOT NULL, 
   zip VARCHAR(5),
   PRIMARY KEY (station_id)
-);
+)
 """
 
 create_olap_sales_weather = f"""
@@ -157,97 +157,188 @@ CREATE TABLE {olap_sales_weather} (
 )
 """
 
-load_staging = """
+load_staging_postgres = """
 SELECT aws_s3.table_import_from_s3(
     '{table_name}',
     '',
     '{{source_format}}',
     '{{bucket}}', '{{key}}', '{{region}}',
     '{{access_key}}', '{{secret_key}}', ''
-);
+)
 """
 
-load_staging_sales = load_staging.format(table_name=staging_sales)
-load_staging_weather = load_staging.format(table_name=staging_weather)
+load_staging_sales_postgres = load_staging_postgres.format(table_name=staging_sales)
+load_staging_weather_postgres = load_staging_postgres.format(table_name=staging_weather)
 
-insert_invoices = f"""
-INSERT INTO {invoices} (
+load_staging_redshift = """
+COPY {table_name} 
+FROM 's3://{{bucket}}/{{key}}' 
+IAM_ROLE '{{iam}}' 
+{{source_format}} 
+REGION '{{region}}' 
+COMPUPDATE OFF STATUPDATE OFF
+"""
+
+load_staging_sales_redshift = load_staging_redshift.format(table_name=staging_sales)
+load_staging_weather_redshift = load_staging_redshift.format(table_name=staging_weather)
+
+
+# insert_invoices = f"""
+# INSERT INTO {invoices} (
+#     SELECT
+#         DISTINCT ON (invoice_id) invoice_id,
+#         store_id,
+#         item_id,
+#         date,
+#         bottle_cost,
+#         bottle_retail,
+#         bottles_sold,
+#         total_sale
+#     FROM {staging_sales}
+#     WHERE invoice_id IS NOT NULL
+#     ORDER BY invoice_id, date
+# );
+# """
+
+# Query template to get a distinct row for each group that is generic across postgres and redshift
+select_distinct = """
+WITH cte AS
+(
     SELECT
-        DISTINCT ON (invoice_id) invoice_id,
-        store_id,
-        item_id,
-        date,
-        bottle_cost,
-        bottle_retail,
-        bottles_sold,
-        total_sale
-    FROM {staging_sales}
-    WHERE invoice_id IS NOT NULL
-    ORDER BY invoice_id, date
-);
+        {columns},
+        ROW_NUMBER() OVER (PARTITION BY {partition_by} ORDER BY {order_by}) as row_number
+        FROM {source_table}
+)
+SELECT
+    {columns}
+FROM cte
+WHERE row_number = 1
 """
 
-insert_stores = f"""
-INSERT INTO {stores} (
-    SELECT
-        DISTINCT ON (store_id) store_id,
-        store_name,
-        zip
-    FROM {staging_sales}
-    WHERE store_id IS NOT NULL
-    ORDER BY store_id, date
-);
+# Query template for inserting distinct rows for each group that is generic across postgres and redshift
+insert_distinct = f"""
+INSERT INTO {{table_name}} (
+{select_distinct}
+)
 """
 
-insert_items = f"""
-INSERT INTO {items} (
-    SELECT
-        DISTINCT ON (item_id) item_id, 
-        item_description, 
-        category_id, 
-        vendor_id
-    FROM {staging_sales}
-    WHERE item_id IS NOT NULL
-    ORDER BY item_id, date
-);
-"""
+invoice_columns = ["invoice_id",
+                   "store_id",
+                   "item_id",
+                   "date",
+                   "bottle_cost",
+                   "bottle_retail",
+                   "bottles_sold",
+                   "total_sale"]
 
+insert_invoices = insert_distinct.format(
+    table_name=invoices,
+    columns=", ".join(invoice_columns),
+    partition_by="invoice_id",
+    order_by="date DESC",
+    source_table=staging_sales
+)
+
+stores_columns = [
+    "store_id",
+    "store_name",
+    "zip",
+]
+
+insert_stores = insert_distinct.format(
+    table_name=stores,
+    columns=", ".join(stores_columns),
+    partition_by="store_id",
+    order_by="date DESC",
+    source_table=staging_sales
+)
+
+items_columns = [
+    "item_id",
+    "item_description",
+    "category_id",
+    "vendor_id"
+]
+
+insert_items = insert_distinct.format(
+    table_name=items,
+    columns=", ".join(items_columns),
+    partition_by="item_id",
+    order_by="date DESC",
+    source_table=staging_sales
+)
+
+product_categories_columns = [
+    "category_id",
+    "category_name",
+]
+
+insert_product_categories = insert_distinct.format(
+    table_name=product_categories,
+    columns=", ".join(product_categories_columns),
+    partition_by="category_id",
+    order_by="date DESC",
+    source_table=staging_sales
+) + "AND category_id IS NOT NULL"
+
+# Handle product_categories differently so we ensure we get no null category id's
 insert_product_categories = f"""
-INSERT INTO {product_categories} (
-    SELECT 
-        DISTINCT ON (category_id) category_id, 
-        category_name 
-    FROM {staging_sales}
-    WHERE category_id IS NOT NULL
-    ORDER BY category_id, date    
-);
-"""
+INSERT INTO {{table_name}} (
+{select_distinct} AND category_id IS NOT NULL
+)
+""".format(
+    table_name=product_categories,
+    columns=", ".join(product_categories_columns),
+    partition_by="category_id",
+    order_by="date DESC",
+    source_table=staging_sales
+)
 
+weather_stations_columns = [
+    "station_id",
+    "name",
+    "latitude",
+    "longitude",
+]
+
+insert_weather_stations = insert_distinct.format(
+    table_name=weather_stations,
+    columns=", ".join(weather_stations_columns),
+    partition_by="station_id",
+    order_by="date DESC",
+    source_table=staging_weather
+)
+#
+#
+#
+#
+# insert_weather_stations = f"""
+# INSERT INTO {weather_stations} (
+#     SELECT
+#         DISTINCT ON (station_id) station_id,
+#         name as name,
+#         latitude as latitude,
+#         longitude as longitude
+#     FROM {staging_weather}
+#     WHERE station_id IS NOT NULL
+#     ORDER BY station_id, date
+# );
+# """
+
+# Catch blank strings as null, otherwise redshift will raise type error on cast
 insert_weather = f"""
 INSERT INTO {weather} (
     SELECT 
         CAST (station_id as VARCHAR),
         CAST (date as DATE),
-        CAST (precipitation as DECIMAL),
-        CAST (snowfall as DECIMAL),
-        CAST (temperature_max as INTEGER),
-        CAST (temperature_min as INTEGER)
+        CAST (NULLIF(precipitation, '') as DECIMAL),
+        CAST (NULLIF(snowfall, '') as DECIMAL),
+        CAST (NULLIF(temperature_max, '') as INTEGER),
+        CAST (NULLIF(temperature_min, '') as INTEGER)
     FROM {staging_weather}
-);
+)
 """
 
-insert_weather_stations = f"""
-INSERT INTO {weather_stations} (
-    SELECT
-        DISTINCT ON (station_id) station_id,
-        name as name,
-        latitude as latitude,
-        longitude as longitude
-    FROM {staging_weather}
-    WHERE station_id IS NOT NULL
-    ORDER BY station_id, date
-);
-"""
 
 insert_olap_sales_weather = f"""
 INSERT INTO {olap_sales_weather} (
@@ -280,7 +371,7 @@ INSERT INTO {olap_sales_weather} (
     ) t
     WHERE rn = 1
     ORDER BY t.invoice_id
-);
+)
 """
 
 create_staging_table_queries = {
@@ -319,11 +410,18 @@ drop_olap_table_queries = {
     olap_sales_weather: drop_olap_sales_weather,
 }
 
-load_staging_queries = {
-    staging_sales: load_staging_sales,
-    staging_weather: load_staging_weather,
+load_staging_queries_postgres = {
+    staging_sales: load_staging_sales_postgres,
+    staging_weather: load_staging_weather_postgres,
 }
-insert_table_queries = {
+
+load_staging_queries_redshift = {
+    staging_sales: load_staging_sales_redshift,
+    staging_weather: load_staging_weather_redshift,
+}
+
+
+insert_table_queries_postgres = {
     product_categories: insert_product_categories, 
     items: insert_items,
     stores: insert_stores,
@@ -343,15 +441,34 @@ WHERE
     latitude IS NOT NULL 
     AND longitude IS NOT NULL 
     AND zip IS NULL 
-;
 """
 
+# # Could use this for postgres, but redshift does not support update from values.  Use common syntax below
+# insert_station_zip_POSTGRES = f"""
+# UPDATE {weather_stations} AS ws SET
+#   zip = new.zip
+# FROM (VALUES
+#   {{values}}
+# ) as new(station_id, zip)
+# where ws.station_id = new.station_id
+# """
+
 insert_station_zip = f"""
-UPDATE {weather_stations} AS ws SET
-  zip = new.zip
-FROM (VALUES
-  {{values}}
-) as new(station_id, zip)
-where ws.station_id = new.station_id
+CREATE TEMPORARY TABLE new_zips (
+  station_id VARCHAR(11) NOT NULL, 
+  zip VARCHAR(5)
+);
+INSERT INTO new_zips
+VALUES
+    {{values}}
 ;
+UPDATE {weather_stations} 
+SET zip=selected.zip
+FROM (
+	SELECT station_id
+  		 , zip
+ 	FROM new_zips
+) selected
+WHERE {weather_stations}.station_id=selected.station_id
 """
+

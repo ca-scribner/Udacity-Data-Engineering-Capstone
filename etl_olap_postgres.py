@@ -1,11 +1,7 @@
 import psycopg2
-import argparse
-import yaml
-from uszipcode import SearchEngine
 
-from sql_postgres import insert_table_queries, load_staging_queries, get_station_latitude_longitude, insert_station_zip, \
-    insert_olap_table_queries
-from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip
+from sql_postgres import insert_olap_table_queries
+from utilities import test_table_has_rows, test_table_has_no_rows, load_settings
 
 
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
@@ -19,8 +15,6 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
         check_before (bool): If true, checks if a table is empty before load
         check_after (bool): If true, checks if a table has data after load
     """
-    print(table_name)
-    print(query)
     # Test destination table is empty
     if check_before:
         test_table_has_no_rows(engine, table_name)
@@ -61,14 +55,6 @@ def insert_check_tables(engine):
 
     for table_name, q in insert_olap_table_queries.items():
         load_check_table(engine, table_name, q)
-
-
-def load_settings():
-    with open('secrets.yml', 'r') as stream:
-        secrets = yaml.safe_load(stream)
-    with open('data.yml', 'r') as stream:
-        data_cfg = yaml.safe_load(stream)
-    return secrets, data_cfg    
 
 
 if __name__ == "__main__":

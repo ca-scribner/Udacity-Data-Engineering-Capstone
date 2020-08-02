@@ -1,10 +1,10 @@
 import psycopg2
 import argparse
-import yaml
 from uszipcode import SearchEngine
 
-from sql_postgres import insert_table_queries, load_staging_queries, get_station_latitude_longitude, insert_station_zip
-from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip
+from sql_postgres import insert_table_queries_postgres, get_station_latitude_longitude, insert_station_zip, \
+    load_staging_queries_postgres, load_staging_queries_redshift
+from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip, load_settings
 
 
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
@@ -32,22 +32,46 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
 
     engine.commit()
 
-    
-def populate_query(q, data_cfg, secrets):
+
+def get_load_query(table_name, data_cfg, secrets, db_type="postgres"):
     q_settings = dict(
-        source_format=data_cfg["source_format"],
+        source_format=data_cfg[f"source_format_{db_type}"],
         bucket=data_cfg["bucket"],
         key=data_cfg["key"],
         region=data_cfg["region"],
-        access_key=secrets["aws"]["access_key"],
-        secret_key=secrets["aws"]["secret_key"],
     )
+    if db_type == "postgres":
+        q_settings["access_key"] = secrets["aws"]["access_key"]
+        q_settings["secret_key"] = secrets["aws"]["secret_key"]
+    elif db_type == "redshift":
+        q_settings["iam"] = secrets["redshift"]["arn"]
+    else:
+        raise ValueError(f"Unknown db_type {db_type}")
+
+    staging_query_map = {
+        'redshift': load_staging_queries_redshift,
+        'postgres': load_staging_queries_postgres
+    }
+    q = staging_query_map[db_type][table_name]
     return q.format(**q_settings)
+#
+#
+# def get_load_query(q, data_cfg, secrets, source_format_key="source_format"):
+#     q = load_staging_queries[table_name]
+#     q_settings = dict(
+#         source_format=data_cfg[source_format_key],
+#         bucket=data_cfg["bucket"],
+#         key=data_cfg["key"],
+#         region=data_cfg["region"],
+#         access_key=secrets["aws"]["access_key"],
+#         secret_key=secrets["aws"]["secret_key"],
+#     )
+#     return q.format(**q_settings)
 
 
 # TODO: REMAKE DOCSTRING
 # (engine, bucket, key, region, source_format, access_key, secret_key):
-def load_check_staging_tables(engine, data_sources, data_cfg, secrets):
+def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="postgres"):
     """
     Loads all staging tables from S3 source
     
@@ -63,13 +87,12 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets):
         secret_ke (str): AWS secret key that can access S3 data
     """
     print("Loading and checking staging tables")
-    
+
     # Stage sales
     table_name = "staging_sales"
     print(f"\tLoading table {table_name}")
 
-    q = load_staging_queries[table_name]
-    q = populate_query(q, data_cfg[data_sources["sales"]], secrets)
+    q = get_load_query(table_name, data_cfg[data_sources["sales"]], secrets, db_type)
     load_check_table(engine, table_name, q)
 
     # Stage weather
@@ -81,11 +104,9 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets):
     
     # Load data from all raw weather files
     for key in data_cfg[data_sources["weather"]]['key']:
-        print(f"\t\tLoading key {key}")
-        this_data_cfg = data_cfg[data_sources["sales"]]
+        this_data_cfg = data_cfg[data_sources["weather"]].copy()
         this_data_cfg['key'] = key
-        q = load_staging_queries[table_name]
-        q = populate_query(q, data_cfg[data_sources["sales"]], secrets)
+        q = get_load_query(table_name, this_data_cfg, secrets, db_type)
         load_check_table(engine, table_name, q, check_before=False)
 
 
@@ -100,7 +121,8 @@ def insert_check_tables(engine):
     """
     print("Loading and checking production tables")
 
-    for table_name, q in insert_table_queries.items():
+    for table_name, q in insert_table_queries_postgres.items():
+        print(q)
         load_check_table(engine, table_name, q)
 
 
@@ -111,15 +133,13 @@ def parse_arguments():
         action="store_true", 
         help="If set, use testing subset data rather than production data"
     )
+    parser.add_argument(
+        '--db',
+        action="store",
+        default="postgres",
+        help="Name of db credentials in secrets.yaml.  Use this to point at different dbs (postgres, redshift, ...)"
+    )
     return parser.parse_args()
-    
-    
-def load_settings():
-    with open('secrets.yml', 'r') as stream:
-        secrets = yaml.safe_load(stream)
-    with open('data.yml', 'r') as stream:
-        data_cfg = yaml.safe_load(stream)
-    return secrets, data_cfg    
 
 
 def add_zip_to_weather_stations(engine):
@@ -135,14 +155,14 @@ def add_zip_to_weather_stations(engine):
     records = cur.fetchall()
 
     search = SearchEngine(simple_zipcode=True)
-    search = SearchEngine(simple_zipcode=True)
-    f = lambda t: (t[0], lat_long_to_zip(t[1], t[2], search))
-    zipcode_records = map(f, records)
+    zip_fun = lambda t: (t[0], lat_long_to_zip(t[1], t[2], search))
+    zipcode_records = map(zip_fun, records)
 
     # Values in format needed for sql (series of "(stn_id, zip), (stn_id, zip), ...")
     values = ", ".join([str(r) for r in zipcode_records])
 
     insert_query = insert_station_zip.format(values=values)
+    print(insert_query)
 
     cur.execute(insert_query)
     engine.commit()
@@ -162,20 +182,21 @@ if __name__ == "__main__":
         data_sources['sales'] = data_sources['sales'] + "_test"
         
     secrets, data_cfg = load_settings()
-    
+
     engine = psycopg2.connect(
-        database=secrets["postgres"]["database"],
-        user=secrets["postgres"]["user"],
-        password=secrets["postgres"]["password"],
-        host=secrets["postgres"]["host"],
-        port=secrets["postgres"]["port"],
+        database=secrets[args.db]["database"],
+        user=secrets[args.db]["user"],
+        password=secrets[args.db]["password"],
+        host=secrets[args.db]["host"],
+        port=secrets[args.db]["port"],
     )
-    
+
     load_check_staging_tables(
         engine,
         data_sources,
         data_cfg,
-        secrets
+        secrets,
+        db_type=args.db
     )
 
     insert_check_tables(engine)

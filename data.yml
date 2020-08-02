@@ -2,13 +2,15 @@ sales_raw:
     region: us-west-2
     bucket: udacity-de-capstone-182
     key: raw-data/sales/iowa_liquor_sales.csv
-    source_format: (FORMAT CSV, HEADER TRUE)
+    source_format_postgres: (FORMAT CSV, HEADER TRUE)
+    source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'MM/DD/YYYY'
 
 sales_raw_test:
     region: us-west-2
     bucket: udacity-de-capstone-182
     key: raw-data/sales/iowa_liquor_sales_h10000.csv
-    source_format: (FORMAT CSV, HEADER TRUE)
+    source_format_postgres: (FORMAT CSV, HEADER TRUE)
+    source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'MM/DD/YYYY'
 
 weather_raw:
     region: us-west-2
@@ -21,4 +23,5 @@ weather_raw:
     - raw-data/weather/2016.csv
     - raw-data/weather/2017.csv
     - raw-data/weather/2018.csv
-    source_format: (FORMAT CSV HEADER TRUE)
+    source_format_postgres: (FORMAT CSV, HEADER TRUE)
+    source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'YYYY-MM-DD'
