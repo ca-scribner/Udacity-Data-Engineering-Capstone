@@ -1,9 +1,11 @@
 import psycopg2
 import argparse
 import yaml
+from uszipcode import SearchEngine
 
-from sql_postgres import insert_table_queries, load_staging_queries
-from utilities import test_table_has_rows, test_table_has_no_rows
+from sql_postgres import insert_table_queries, load_staging_queries, get_station_latitude_longitude, insert_station_zip
+from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip
+
 
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
     """
@@ -122,6 +124,32 @@ def load_settings():
     return secrets, data_cfg    
 
 
+def add_zip_to_weather_stations(engine):
+    """
+    Adds zip code to all records in weather_stations that have lat/long but not zip codes
+
+    Args:
+        engine: psycopg2 engine connected to postgres database
+    """
+    print("Adding zip code to weather stations")
+    cur = engine.cursor()
+    cur.execute(get_station_latitude_longitude)
+    records = cur.fetchall()
+
+    search = SearchEngine(simple_zipcode=True)
+    search = SearchEngine(simple_zipcode=True)
+    f = lambda t: (t[0], lat_long_to_zip(t[1], t[2], search))
+    zipcode_records = map(f, records)
+
+    # Values in format needed for sql (series of "(stn_id, zip), (stn_id, zip), ...")
+    values = ", ".join([str(r) for r in zipcode_records])
+
+    insert_query = insert_station_zip.format(values=values)
+
+    cur.execute(insert_query)
+    engine.commit()
+
+
 if __name__ == "__main__":
     """
     Stage S3 data to Postgres and then insert it into production tables
@@ -146,11 +174,13 @@ if __name__ == "__main__":
     )
     
     load_check_staging_tables(
-        engine, 
+        engine,
         data_sources,
         data_cfg,
         secrets
     )
 
     insert_check_tables(engine)
+
+    add_zip_to_weather_stations(engine)
 

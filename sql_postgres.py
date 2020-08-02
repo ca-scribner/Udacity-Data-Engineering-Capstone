@@ -268,3 +268,24 @@ insert_table_queries = {
     weather_stations: insert_weather_stations,
     weather: insert_weather,
 }
+
+
+# Other queries
+get_station_latitude_longitude = f"""
+SELECT station_id, latitude, longitude FROM {weather_stations} 
+WHERE 
+    latitude IS NOT NULL 
+    AND longitude IS NOT NULL 
+    AND zip IS NULL 
+;
+"""
+
+insert_station_zip = f"""
+UPDATE {weather_stations} AS ws SET
+  zip = new.zip
+FROM (VALUES
+  {{values}}
+) as new(station_id, zip)
+where ws.station_id = new.station_id
+;
+"""

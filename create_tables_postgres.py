@@ -4,6 +4,7 @@ import configparser
 from sql_postgres import create_staging_table_queries, create_table_queries
 from sql_postgres import drop_staging_table_queries, drop_table_queries
 
+
 def drop_tables(engine):
     """
     Drops all production and staging tables in database
