@@ -1,0 +1,24 @@
+sales_raw:
+    region: us-west-2
+    bucket: udacity-de-capstone-182
+    key: raw-data/sales/iowa_liquor_sales.csv
+    source_format: (FORMAT CSV, HEADER TRUE)
+
+sales_raw_test:
+    region: us-west-2
+    bucket: udacity-de-capstone-182
+    key: raw-data/sales/iowa_liquor_sales_h10000.csv
+    source_format: (FORMAT CSV, HEADER TRUE)
+
+weather_raw:
+    region: us-west-2
+    bucket: udacity-de-capstone-182
+    key: 
+    - raw-data/weather/2012.csv
+    - raw-data/weather/2013.csv
+    - raw-data/weather/2014.csv
+    - raw-data/weather/2015.csv
+    - raw-data/weather/2016.csv
+    - raw-data/weather/2017.csv
+    - raw-data/weather/2018.csv
+    source_format: (FORMAT CSV HEADER TRUE)

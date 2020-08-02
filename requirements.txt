@@ -1,0 +1,9 @@
+psycopg2
+pyyaml
+
+# etl
+geopy
+
+# Dev only?
+pandas
+csvkit
