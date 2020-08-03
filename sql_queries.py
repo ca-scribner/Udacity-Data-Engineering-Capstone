@@ -29,115 +29,146 @@ drop_olap_sales_weather = drop.format(table_name=olap_sales_weather)
 drop_staging_sales = drop.format(table_name=staging_sales)
 drop_staging_weather = drop.format(table_name=staging_weather)
 
+staging_sales_columns = {
+    "invoice_id": "VARCHAR NOT NULL",
+    "date": "DATE NOT NULL",
+    "store_id": "DECIMAL NOT NULL",
+    "store_name": "VARCHAR NOT NULL",
+    "address": "VARCHAR NOT NULL",
+    "city": "VARCHAR NOT NULL",
+    "zip": "VARCHAR NOT NULL",
+    "store_location": "VARCHAR",
+    "county_number": "DECIMAL",
+    "county": "VARCHAR",
+    "category_id": "DECIMAL",
+    "category_name": "VARCHAR",
+    "vendor_id": "DECIMAL NOT NULL",
+    "vendor_name": "VARCHAR NOT NULL",
+    "item_id": "DECIMAL NOT NULL",
+    "item_description": "VARCHAR NOT NULL",
+    "pack": "DECIMAL NOT NULL",
+    "bottle_volume_ml": "DECIMAL NOT NULL",
+    "bottle_cost": "DECIMAL NOT NULL",
+    "bottle_retail": "DECIMAL NOT NULL",
+    "bottles_sold": "DECIMAL NOT NULL",
+    "total_sale": "DECIMAL NOT NULL",
+    "volume_sold_liters": "DECIMAL NOT NULL",
+    "volume_sold_gallons": "DECIMAL NOT NULL",
+}
 create_staging_sales = f"""
 CREATE TABLE {staging_sales} (
-  invoice_id VARCHAR NOT NULL, 
-  date DATE NOT NULL, 
-  store_id DECIMAL NOT NULL, 
-  store_name VARCHAR NOT NULL, 
-  address VARCHAR NOT NULL, 
-  city VARCHAR NOT NULL, 
-  zip VARCHAR NOT NULL, 
-  store_location VARCHAR, 
-  county_number DECIMAL, 
-  county VARCHAR, 
-  category_id DECIMAL, 
-  category_name VARCHAR, 
-  vendor_id DECIMAL NOT NULL, 
-  vendor_name VARCHAR NOT NULL, 
-  item_id DECIMAL NOT NULL, 
-  item_description VARCHAR NOT NULL, 
-  pack DECIMAL NOT NULL, 
-  bottle_volume_ml DECIMAL NOT NULL, 
-  bottle_cost DECIMAL NOT NULL, 
-  bottle_retail DECIMAL NOT NULL, 
-  bottles_sold DECIMAL NOT NULL, 
-  total_sale DECIMAL NOT NULL, 
-  volume_sold_liters DECIMAL NOT NULL, 
-  volume_sold_gallons DECIMAL NOT NULL
+  {", ".join(f"{name} {spec}" for name, spec in staging_sales_columns.items())}
 )
 """
+
+staging_weather_columns = {
+    "station_id": "VARCHAR",
+    "name": "VARCHAR",
+    "latitude": "VARCHAR",
+    "longitude": "VARCHAR",
+    "elevation": "VARCHAR",
+    "date": "DATE",
+    "precipitation": "VARCHAR",
+    "snowfall": "VARCHAR",
+    "temperature_max": "VARCHAR",
+    "temperature_min": "VARCHAR",
+}
 
 create_staging_weather = f"""
 CREATE TABLE {staging_weather} (
-  "station_id" VARCHAR, 
-  "name" VARCHAR, 
-  "latitude" VARCHAR, 
-  "longitude" VARCHAR, 
-  "elevation" VARCHAR, 
-  "date" DATE, 
-  "precipitation" VARCHAR, 
-  "snowfall" VARCHAR, 
-  "temperature_max" VARCHAR, 
-  "temperature_min" VARCHAR
+  {", ".join(f"{name} {spec}" for name, spec in staging_weather_columns.items())}
 )
 """
 
+invoices_columns = {
+    "invoice_id": "VARCHAR(16) NOT NULL",
+    "store_id": "VARCHAR(4) NOT NULL",
+    "item_id": "VARCHAR(6) NOT NULL",
+    "date": "DATE NOT NULL",
+    "bottle_cost": "DECIMAL(7,3) NOT NULL",
+    "bottle_retail": "DECIMAL(7,3) NOT NULL",
+    "bottles_sold": "SMALLINT NOT NULL",
+    "total_sale": "DECIMAL(8,3) NOT NULL",
+}
+
 create_invoices = f"""
 CREATE TABLE {invoices} (
-  invoice_id VARCHAR(16) NOT NULL, 
-  store_id VARCHAR(4) NOT NULL, 
-  item_id VARCHAR(6) NOT NULL, 
-  date DATE NOT NULL, 
-  bottle_cost DECIMAL(7,3) NOT NULL, 
-  bottle_retail DECIMAL(7,3) NOT NULL, 
-  bottles_sold SMALLINT NOT NULL, 
-  total_sale DECIMAL(8,3) NOT NULL,
+  {", ".join(f"{name} {spec}" for name, spec in invoices_columns.items())},
   PRIMARY KEY (invoice_id),
   FOREIGN KEY (store_id) REFERENCES {stores},
   FOREIGN KEY (item_id) REFERENCES {items}
 )
 """
 
+stores_columns = {
+    "store_id": "VARCHAR(4) NOT NULL",
+    "store_name": "VARCHAR(50) NOT NULL",
+    "zip": "VARCHAR(5) NOT NULL",
+    "store_location": "VARCHAR",
+}
+
 create_stores = f"""
 CREATE TABLE {stores} (
-  store_id VARCHAR(4) NOT NULL, 
-  store_name VARCHAR(50) NOT NULL, 
-  zip VARCHAR(5) NOT NULL, 
-  store_location VARCHAR,
+  {", ".join(f"{name} {spec}" for name, spec in stores_columns.items())},
   PRIMARY KEY (store_id)
 )
 """
 
+items_columns = {
+    "item_id": "VARCHAR(6) NOT NULL",
+    "item_description": "VARCHAR(70) NOT NULL",
+    "category_id": "VARCHAR(7)",
+    "vendor_id": "VARCHAR(3) NOT NULL",
+}
+
 create_items = f"""
 CREATE TABLE {items} (
-  item_id VARCHAR(6) NOT NULL, 
-  item_description VARCHAR(70) NOT NULL, 
-  category_id VARCHAR(7), 
-  vendor_id VARCHAR(3) NOT NULL,
+  {", ".join(f"{name} {spec}" for name, spec in items_columns.items())},
   PRIMARY KEY (item_id),
   FOREIGN KEY (category_id) REFERENCES {product_categories}
 )
 """
 
+product_categories_columns = {
+    "category_id": "VARCHAR(7) NOT NULL",
+    "category_name": "VARCHAR(50)",
+}
+
 create_product_categories = f"""
 CREATE TABLE {product_categories} (
-  category_id VARCHAR(7) NOT NULL, 
-  category_name VARCHAR(50),
+  {", ".join(f"{name} {spec}" for name, spec in product_categories_columns.items())},
   PRIMARY KEY (category_id)
 )
 """
 
+weather_columns = {
+    "station_id": "VARCHAR(11) NOT NULL",
+    "date": "DATE NOT NULL",
+    "precipitation": "DECIMAL(5, 3)",
+    "snowfall": "DECIMAL(5, 3)",
+    "temperature_max": "INTEGER",
+    "temperature_min": "INTEGER",
+}
+
 create_weather = f"""
 CREATE TABLE {weather} (
-  station_id VARCHAR(11) NOT NULL, 
-  date DATE NOT NULL, 
-  precipitation DECIMAL(5, 3),
-  snowfall DECIMAL(5, 3),
-  temperature_max INTEGER, 
-  temperature_min INTEGER,
+  {", ".join(f"{name} {spec}" for name, spec in weather_columns.items())},
   PRIMARY KEY (station_id, date),
   FOREIGN KEY (station_id) REFERENCES {weather_stations}
 )
 """
 
+weather_stations_columns = {
+    "station_id": "VARCHAR(11) NOT NULL",
+    "name": "VARCHAR(50) NOT NULL",
+    "latitude": "VARCHAR(17) NOT NULL",
+    "longitude": "VARCHAR(17) NOT NULL",
+    "zip": "VARCHAR(5)",
+}
+
 create_weather_stations = f"""
 CREATE TABLE {weather_stations} (
-  station_id VARCHAR(11) NOT NULL, 
-  name VARCHAR(50) NOT NULL, 
-  latitude VARCHAR(17) NOT NULL, 
-  longitude VARCHAR(17) NOT NULL, 
-  zip VARCHAR(5),
+  {", ".join(f"{name} {spec}" for name, spec in weather_stations_columns.items())},
   PRIMARY KEY (station_id)
 )
 """
@@ -182,24 +213,6 @@ COMPUPDATE OFF STATUPDATE OFF
 load_staging_sales_redshift = load_staging_redshift.format(table_name=staging_sales)
 load_staging_weather_redshift = load_staging_redshift.format(table_name=staging_weather)
 
-
-# insert_invoices = f"""
-# INSERT INTO {invoices} (
-#     SELECT
-#         DISTINCT ON (invoice_id) invoice_id,
-#         store_id,
-#         item_id,
-#         date,
-#         bottle_cost,
-#         bottle_retail,
-#         bottles_sold,
-#         total_sale
-#     FROM {staging_sales}
-#     WHERE invoice_id IS NOT NULL
-#     ORDER BY invoice_id, date
-# );
-# """
-
 # Query template to get a distinct row for each group that is generic across postgres and redshift
 select_distinct = """
 WITH cte AS
@@ -222,28 +235,14 @@ INSERT INTO {{table_name}} (
 )
 """
 
-invoice_columns = ["invoice_id",
-                   "store_id",
-                   "item_id",
-                   "date",
-                   "bottle_cost",
-                   "bottle_retail",
-                   "bottles_sold",
-                   "total_sale"]
 
 insert_invoices = insert_distinct.format(
     table_name=invoices,
-    columns=", ".join(invoice_columns),
+    columns=", ".join(invoices_columns),
     partition_by="invoice_id",
     order_by="date DESC",
     source_table=staging_sales
 )
-
-stores_columns = [
-    "store_id",
-    "store_name",
-    "zip",
-]
 
 insert_stores = insert_distinct.format(
     table_name=stores,
@@ -253,13 +252,6 @@ insert_stores = insert_distinct.format(
     source_table=staging_sales
 )
 
-items_columns = [
-    "item_id",
-    "item_description",
-    "category_id",
-    "vendor_id"
-]
-
 insert_items = insert_distinct.format(
     table_name=items,
     columns=", ".join(items_columns),
@@ -267,19 +259,6 @@ insert_items = insert_distinct.format(
     order_by="date DESC",
     source_table=staging_sales
 )
-
-product_categories_columns = [
-    "category_id",
-    "category_name",
-]
-
-insert_product_categories = insert_distinct.format(
-    table_name=product_categories,
-    columns=", ".join(product_categories_columns),
-    partition_by="category_id",
-    order_by="date DESC",
-    source_table=staging_sales
-) + "AND category_id IS NOT NULL"
 
 # Handle product_categories differently so we ensure we get no null category id's
 insert_product_categories = f"""
@@ -294,38 +273,18 @@ INSERT INTO {{table_name}} (
     source_table=staging_sales
 )
 
-weather_stations_columns = [
-    "station_id",
-    "name",
-    "latitude",
-    "longitude",
-]
+this_weather_stations_columns = [x for x in weather_stations_columns.keys() if x != "zip"]
 
 insert_weather_stations = insert_distinct.format(
     table_name=weather_stations,
-    columns=", ".join(weather_stations_columns),
+    columns=", ".join(this_weather_stations_columns),
     partition_by="station_id",
     order_by="date DESC",
     source_table=staging_weather
 )
-#
-#
-#
-#
-# insert_weather_stations = f"""
-# INSERT INTO {weather_stations} (
-#     SELECT
-#         DISTINCT ON (station_id) station_id,
-#         name as name,
-#         latitude as latitude,
-#         longitude as longitude
-#     FROM {staging_weather}
-#     WHERE station_id IS NOT NULL
-#     ORDER BY station_id, date
-# );
-# """
 
-# Catch blank strings as null, otherwise redshift will raise type error on cast
+# Use NULLIF to catch blank strings as null.  Postgres does not need this, but without it redshift will raise type error
+# on cast
 insert_weather = f"""
 INSERT INTO {weather} (
     SELECT 

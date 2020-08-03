@@ -1,6 +1,6 @@
 import psycopg2
 
-from sql_postgres import insert_olap_table_queries
+from sql_queries import insert_olap_table_queries
 from utilities import test_table_has_rows, test_table_has_no_rows, load_settings
 
 

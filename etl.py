@@ -2,7 +2,7 @@ import psycopg2
 import argparse
 from uszipcode import SearchEngine
 
-from sql_postgres import insert_table_queries_postgres, get_station_latitude_longitude, insert_station_zip, \
+from sql_queries import insert_table_queries_postgres, get_station_latitude_longitude, insert_station_zip, \
     load_staging_queries_postgres, load_staging_queries_redshift
 from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip, load_settings
 
@@ -122,7 +122,6 @@ def insert_check_tables(engine):
     print("Loading and checking production tables")
 
     for table_name, q in insert_table_queries_postgres.items():
-        print(q)
         load_check_table(engine, table_name, q)
 
 
@@ -162,7 +161,6 @@ def add_zip_to_weather_stations(engine):
     values = ", ".join([str(r) for r in zipcode_records])
 
     insert_query = insert_station_zip.format(values=values)
-    print(insert_query)
 
     cur.execute(insert_query)
     engine.commit()
