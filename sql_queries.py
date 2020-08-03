@@ -37,7 +37,7 @@ staging_sales_columns = {
     # "address": "VARCHAR NOT NULL",
     # "city": "VARCHAR NOT NULL",
     "zip": "VARCHAR NOT NULL",
-    "store_location": "VARCHAR",
+    # "store_location": "VARCHAR",
     # "county_number": "DECIMAL",
     # "county": "VARCHAR",
     "category_id": "DECIMAL",
@@ -48,10 +48,10 @@ staging_sales_columns = {
     "item_description": "VARCHAR NOT NULL",
     # "pack": "DECIMAL NOT NULL",
     # "bottle_volume_ml": "DECIMAL NOT NULL",
-    "bottle_cost": "DECIMAL NOT NULL",
-    "bottle_retail": "DECIMAL NOT NULL",
-    "bottles_sold": "DECIMAL NOT NULL",
-    "total_sale": "DECIMAL NOT NULL",
+    "bottle_cost": "DECIMAL",
+    "bottle_retail": "DECIMAL",
+    "bottles_sold": "DECIMAL",
+    "total_sale": "DECIMAL",
     # "volume_sold_liters": "DECIMAL NOT NULL",
     # "volume_sold_gallons": "DECIMAL NOT NULL",
 }
@@ -235,15 +235,6 @@ INSERT INTO {{table_name}} (
 )
 """
 
-
-insert_invoices = insert_distinct.format(
-    table_name=invoices,
-    columns=", ".join(invoices_columns),
-    partition_by="invoice_id",
-    order_by="date DESC",
-    source_table=staging_sales
-)
-
 insert_stores = insert_distinct.format(
     table_name=stores,
     columns=", ".join(stores_columns),
@@ -272,6 +263,24 @@ INSERT INTO {{table_name}} (
     order_by="date DESC",
     source_table=staging_sales
 )
+
+# Handle invoices differently so we ensure we get no null price/bottle
+insert_invoices = f"""
+INSERT INTO {{table_name}} (
+{select_distinct} 
+AND bottle_cost IS NOT NULL
+AND bottle_retail IS NOT NULL
+AND bottles_sold IS NOT NULL
+AND total_sale IS NOT NULL
+)
+""".format(
+    table_name=invoices,
+    columns=", ".join(invoices_columns),
+    partition_by="invoice_id",
+    order_by="date DESC",
+    source_table=staging_sales
+)
+
 
 this_weather_stations_columns = [x for x in weather_stations_columns.keys() if x != "zip"]
 

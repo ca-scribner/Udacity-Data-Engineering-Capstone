@@ -46,7 +46,12 @@ def parse_args():
     )
     parser.add_argument(
         'month_end',
-        help='Last month to pull data (inclusive, in YYYY-MM format)'
+        help='Last month to pull data (exclusive, in YYYY-MM format)'
+    )
+    parser.add_argument(
+        '--data_spec',
+        default='sales_raw',
+        help='Name of data specifications in data.yml.  This specifies the destination of the data'
     )
     parser.add_argument(
         '--no_csv',
@@ -57,6 +62,17 @@ def parse_args():
         '--no_pq',
         action='store_true',
         help='If set, will not output parquet files to S3',
+    )
+    parser.add_argument(
+        '--limit',
+        action='store',
+        help='Maximum number of records requested per month'
+    )
+    parser.add_argument(
+        '--action_on_limit',
+        action='store',
+        default='raise',
+        help='Action if record limit reached for a given month.  Options are "raise" or "warn"'
     )
 
     return parser.parse_args()
@@ -77,7 +93,7 @@ if __name__ == "__main__":
 
     columns = [SALES_NAME_MAP_APP_TO_SOURCE[name] for name in staging_sales_columns]
     select = ", ".join(columns)
-    limit = 1000000
+    limit = int(args.limit)
     order = "date"
     source_key = "m3tr-qhgy"
 
@@ -101,8 +117,13 @@ if __name__ == "__main__":
 
         # Catch if we maxed our return limit
         if len(results) == limit:
-            raise ValueError("Download limit reached - need to handle this better")
-
+            if args.action_on_limit == 'warn':
+                print("WARNING: dowload limit reached")
+            elif args.action_on_limit == 'raise':
+                raise ValueError("Error: Download limit reached")
+            else:
+                raise ValueError("Error: Download limit reached and invalid action_on_limit specified "
+                                 f"({args.action_on_limit})")
         df = pd.DataFrame(results).rename(columns=SALES_NAME_MAP_SOURCE_TO_APP)
         url_template = f's3://{{bucket}}/{{key_base}}/{start_date.year:02d}/{start_date.month:02d}/{start_date.year:04d}-{start_date.month:02d}{{suffix}}'
 

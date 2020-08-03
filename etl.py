@@ -35,6 +35,10 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
 
 
 def get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type="postgres"):
+    if file_to_stage.startswith('s3://'):
+        # Strip leading s3://{bucket}/
+        file_to_stage = "/".join(file_to_stage.lstrip("s3://").split("/")[1:])
+
     q_settings = dict(
         source_format=data_cfg[f"source_format_{db_type}"],
         bucket=data_cfg["bucket"],
