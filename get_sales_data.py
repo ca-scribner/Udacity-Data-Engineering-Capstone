@@ -120,6 +120,7 @@ if __name__ == "__main__":
                     df=df,
                     path=output_url,
                     s3_additional_kwargs=s3_additional_kwargs,
+                    index=False,  # Do not export empty index column
                 )
 
         # Save to parquet
@@ -137,4 +138,5 @@ if __name__ == "__main__":
                     path=output_url,
                     s3_additional_kwargs=s3_additional_kwargs,
                     compression=data_cfg["sales_raw"]["parquet"]["compression"],
+                    index=False,  # Do not export empty index column
                 )
