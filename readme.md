@@ -1,3 +1,4 @@
+# At least two data sources/formats (csv, api, json)
 
 
 
@@ -6,6 +7,9 @@
 # Project: Data Warehouse
 
 This project explores the use of AWS' managed Postgres and Redshift database services using [Iowa liquor sales data]() joined with [weather data]().  The objectives are to learn more of how these two offerings behave for both an OLTP and OLAP workflow.  In particular, this will be explored from the perspective of a user who needs to support both a source of truth (must have access to in-sync data, although this access need not be fully performant and could be infrequent) and analytics workflows (such as for a dashboard or machine learning use cases).
+
+TO ADD: 
+* explore and assess data, before schema?
 
 # Source Data
 TODO
@@ -32,6 +36,10 @@ songs - songs in music database: song_id, title, artist_id, year, and duration
 artists - artists in music database: artist_id, name, location, latitude, and longitude
 time - timestamps of records in songplays broken down into specific units: start_time, hour, day, week, month, year, and weekday
 The above schema prioritizes the goal of the workflow, analyzing song play analysis, by centering the schema on the songplay fact table. This tries to minimize the JOIN statements required to analyze data related to song plays. For example:
+
+* ETL requirements
+* Data quality checks
+* Data dictionary
 
 # Table Optimization
 
@@ -68,3 +76,16 @@ python etl.py
 # Run instructions
 
 TODO
+
+# Comparison between Postgres and Redshift
+
+(for this use case)
+
+# Recommendations and Conclusions
+
+* Clearly state the rationale for the choice of tools and technologies for the project.
+* Propose how often the data should be updated and why.
+* Write a description of how you would approach the problem differently under the following scenarios:
+     * The data was increased by 100x.
+     * The data populates a dashboard that must be updated on a daily basis by 7am every day.
+     * The database needed to be accessed by 100+ people.
