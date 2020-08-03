@@ -5,7 +5,7 @@ import psycopg2
 from sql_queries import create_staging_table_queries, create_table_queries, drop_olap_table_queries, \
     create_olap_table_queries
 from sql_queries import drop_staging_table_queries, drop_table_queries
-from utilities import load_settings
+from utilities import load_settings, Timer
 
 
 def drop_tables(engine):
@@ -15,7 +15,6 @@ def drop_tables(engine):
     Args:
         engine: psycopg2 engine connected to postgres database
     """
-    print("Dropping existing tables")
     cur = engine.cursor()
     for name, q in drop_staging_table_queries.items():
         print(f"\tDropping {name}")
@@ -39,7 +38,6 @@ def create_tables(engine):
     Args:
         engine: psycopg2 engine connected to postgres database
     """
-    print("Creating new tables")
     cur = engine.cursor()
     for name, q in create_staging_table_queries.items():
         cur.execute(q)
@@ -83,5 +81,9 @@ if __name__ == "__main__":
         port=secrets[args.db]["port"],
     )
 
-    drop_tables(engine)
-    create_tables(engine)
+    with Timer(enter_message="Dropping existing tables", exit_message="drop complete"):
+        drop_tables(engine)
+
+
+    with Timer(enter_message="Creating new tables", exit_message="table creation complete"):
+        create_tables(engine)

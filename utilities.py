@@ -1,4 +1,4 @@
-from time import time
+import time
 from uszipcode import SearchEngine
 import yaml
 

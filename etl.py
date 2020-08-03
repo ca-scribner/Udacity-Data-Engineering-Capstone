@@ -4,7 +4,7 @@ from uszipcode import SearchEngine
 
 from sql_queries import insert_table_queries_postgres, get_station_latitude_longitude, insert_station_zip, \
     load_staging_queries_postgres, load_staging_queries_redshift
-from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip, load_settings
+from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip, load_settings, Timer
 
 
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
@@ -90,24 +90,24 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
 
     # Stage sales
     table_name = "staging_sales"
-    print(f"\tLoading table {table_name}")
 
     q = get_load_query(table_name, data_cfg[data_sources["sales"]], secrets, db_type)
-    load_check_table(engine, table_name, q)
+    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\tload {table_name} complete"):
+        load_check_table(engine, table_name, q)
 
     # Stage weather
     table_name = "staging_weather"
-    print(f"\tLoading table {table_name}")
-    
+
     # Check the table is empty before, but only check before the partial loads
     test_table_has_no_rows(engine, table_name)
     
     # Load data from all raw weather files
-    for key in data_cfg[data_sources["weather"]]['key']:
-        this_data_cfg = data_cfg[data_sources["weather"]].copy()
-        this_data_cfg['key'] = key
-        q = get_load_query(table_name, this_data_cfg, secrets, db_type)
-        load_check_table(engine, table_name, q, check_before=False)
+    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\tload {table_name} complete"):
+        for key in data_cfg[data_sources["weather"]]['key']:
+            this_data_cfg = data_cfg[data_sources["weather"]].copy()
+            this_data_cfg['key'] = key
+            q = get_load_query(table_name, this_data_cfg, secrets, db_type)
+            load_check_table(engine, table_name, q, check_before=False)
 
 
 def insert_check_tables(engine):
@@ -122,7 +122,8 @@ def insert_check_tables(engine):
     print("Loading and checking production tables")
 
     for table_name, q in insert_table_queries_postgres.items():
-        load_check_table(engine, table_name, q)
+        with Timer(enter_message=f"\tInserting into table {table_name}", exit_message=f"\tinsert into {table_name} complete"):
+            load_check_table(engine, table_name, q)
 
 
 def parse_arguments():
@@ -148,7 +149,6 @@ def add_zip_to_weather_stations(engine):
     Args:
         engine: psycopg2 engine connected to postgres database
     """
-    print("Adding zip code to weather stations")
     cur = engine.cursor()
     cur.execute(get_station_latitude_longitude)
     records = cur.fetchall()
@@ -189,15 +189,18 @@ if __name__ == "__main__":
         port=secrets[args.db]["port"],
     )
 
-    load_check_staging_tables(
-        engine,
-        data_sources,
-        data_cfg,
-        secrets,
-        db_type=args.db
-    )
+    with Timer(enter_message="Loading staging tables", exit_message="staging table load complete"):
+        load_check_staging_tables(
+            engine,
+            data_sources,
+            data_cfg,
+            secrets,
+            db_type=args.db
+        )
 
-    insert_check_tables(engine)
+    with Timer(enter_message="Inserting data into tables", exit_message="table insert complete"):
+        insert_check_tables(engine)
 
-    add_zip_to_weather_stations(engine)
+    with Timer(enter_message="Adding zip code to weather stations table", exit_message="add zip complete"):
+        add_zip_to_weather_stations(engine)
 
