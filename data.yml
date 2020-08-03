@@ -3,15 +3,19 @@ sales_raw:
         region: us-west-2
         bucket: udacity-de-capstone-182
         key_base: raw-data/sales/csv
+        suffix: -sales.csv
         key: raw-data/sales/csv/iowa_liquor_sales.csv
         source_format_postgres: (FORMAT CSV, HEADER TRUE)
         source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'MM/DD/YYYY'
+
     parquet:
         region: us-west-2
         bucket: udacity-de-capstone-182
         key_base: raw-data/sales/parquet
+        suffix: -sales.parquet.gz
         key: raw-data/sales/csv/iowa_liquor_sales.csv
         source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'MM/DD/YYYY'
+        compression: gzip
 
 sales_raw_:
     region: us-west-2

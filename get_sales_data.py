@@ -3,7 +3,7 @@ import pandas as pd
 from sodapy import Socrata
 import awswrangler as wr
 
-from utilities import load_settings
+from utilities import load_settings, Timer
 from sql_queries import staging_sales_columns
 
 # Map between the names used in this app and the original data source names
@@ -48,6 +48,17 @@ def parse_args():
         'month_end',
         help='Last month to pull data (inclusive, in YYYY-MM format)'
     )
+    parser.add_argument(
+        '--no_csv',
+        action='store_true',
+        help='If set, will not output csv files to S3',
+    )
+    parser.add_argument(
+        '--no_pq',
+        action='store_true',
+        help='If set, will not output parquet files to S3',
+    )
+
     return parser.parse_args()
 
 
@@ -70,64 +81,60 @@ if __name__ == "__main__":
     order = "date"
     source_key = "m3tr-qhgy"
 
-    print(f"download_dates = {download_dates}")
+    s3_additional_kwargs = dict(
+        aws_access_key_id=secrets['aws']['access_key'],
+        aws_secret_access_key=secrets['aws']['secret_key']
+    )
 
     for start_date, end_date in zip(download_dates[:-1], download_dates[1:]):
 
         start_date_formatted = start_date.strftime("%Y-%m")
         end_date_formatted = end_date.strftime("%Y-%m")
         where = f"date >= '{start_date_formatted}' AND date < '{end_date_formatted}'"
-        print(f"Downloading data where {where}")
-
-        results = source_client.get(source_key,
-                                    select=select,
-                                    order="date",
-                                    where=where,
-                                    limit=limit
-                             )
+        with Timer(enter_message=f"Downloading data where {where}", exit_message="download complete"):
+            results = source_client.get(source_key,
+                                        select=select,
+                                        order="date",
+                                        where=where,
+                                        limit=limit,
+                                 )
 
         # Catch if we maxed our return limit
         if len(results) == limit:
             raise ValueError("Download limit reached - need to handle this better")
 
         df = pd.DataFrame(results).rename(columns=SALES_NAME_MAP_SOURCE_TO_APP)
-
-        url_template = 's3://{bucket}/{key_base}/{year:02d}/{month:02d}/{year:04d}-{month:02d}{suffix}'
+        url_template = f's3://{{bucket}}/{{key_base}}/{start_date.year:02d}/{start_date.month:02d}/{start_date.year:04d}-{start_date.month:02d}{{suffix}}'
 
         # Save to csv
-        output_url = url_template.format(
-            bucket=data_cfg["sales_raw"]["csv"]["bucket"],
-            key_base=data_cfg["sales_raw"]["csv"]["key_base"],
-            year=start_date.year,
-            month=start_date.month,
-            suffix='-sales.csv'
-        )
+        if not args.no_csv:
+            with Timer(enter_message=f"Uploading csv data", exit_message="upload csv complete"):
+                output_url = url_template.format(
+                    bucket=data_cfg["sales_raw"]["csv"]["bucket"],
+                    key_base=data_cfg["sales_raw"]["csv"]["key_base"],
+                    suffix=data_cfg["sales_raw"]["csv"]["suffix"]
+                )
 
-        # Could partition this data further (daily files)
-        wr.s3.to_csv(
-            df=df,
-            path=output_url,
-            s3_additional_kwargs=dict(
-                aws_access_key_id=secrets['aws']['access_key'],
-                aws_secret_access_key=secrets['aws']['secret_key'],
-            )
-        )
+                # Could partition this data further (daily files)
+                wr.s3.to_csv(
+                    df=df,
+                    path=output_url,
+                    s3_additional_kwargs=s3_additional_kwargs,
+                )
 
         # Save to parquet
-        output_url = url_template.format(
-            bucket=data_cfg["sales_raw"]["parquet"]["bucket"],
-            key_base=data_cfg["sales_raw"]["parquet"]["key_base"],
-            year=start_date.year,
-            month=start_date.month,
-            suffix='-sales.parquet'
-        )
+        if not args.no_pq:
+            with Timer(enter_message=f"Uploading parquet data", exit_message="upload csv complete"):
+                output_url = url_template.format(
+                    bucket=data_cfg["sales_raw"]["parquet"]["bucket"],
+                    key_base=data_cfg["sales_raw"]["parquet"]["key_base"],
+                    suffix=data_cfg["sales_raw"]["parquet"]["suffix"]
+                )
 
-        # Could partition this data further (daily files)
-        wr.s3.to_parquet(
-            df=df,
-            path=output_url,
-            s3_additional_kwargs=dict(
-                aws_access_key_id=secrets['aws']['access_key'],
-                aws_secret_access_key=secrets['aws']['secret_key'],
-            )
-        )
+                # Could partition this data further (daily files)
+                wr.s3.to_parquet(
+                    df=df,
+                    path=output_url,
+                    s3_additional_kwargs=s3_additional_kwargs,
+                    compression=data_cfg["sales_raw"]["parquet"]["compression"],
+                )
