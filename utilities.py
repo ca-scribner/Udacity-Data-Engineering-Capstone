@@ -82,7 +82,7 @@ def load_settings(secrets='secrets.yml', data_cfg='data.yml'):
 
 
 class Timer:
-    def __init__(self, enter_message=None, exit_message=None, exit_message_suffix="--> "):
+    def __init__(self, enter_message=None, exit_message=None):
         """
         Construct a simple timer class.
 
@@ -97,9 +97,9 @@ class Timer:
         self.reference_time = None
         self.reset()
         if exit_message is None:
-            self.exit_message = exit_message_suffix
+            self.exit_message = ""
         else:
-            self.exit_message = exit_message_suffix + str(exit_message) + ": "
+            self.exit_message = str(exit_message) + ": "
 
         if enter_message is None:
             self.enter_message = None

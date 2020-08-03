@@ -107,7 +107,7 @@ if __name__ == "__main__":
         start_date_formatted = start_date.strftime("%Y-%m")
         end_date_formatted = end_date.strftime("%Y-%m")
         where = f"date >= '{start_date_formatted}' AND date < '{end_date_formatted}'"
-        with Timer(enter_message=f"Downloading data where {where}", exit_message="download complete"):
+        with Timer(enter_message=f"Downloading data where {where}", exit_message="--> download complete"):
             results = source_client.get(source_key,
                                         select=select,
                                         order="date",
@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
         # Save to csv
         if not args.no_csv:
-            with Timer(enter_message=f"Uploading csv data", exit_message="upload csv complete"):
+            with Timer(enter_message=f"Uploading csv data", exit_message="--> upload csv complete"):
                 output_url = url_template.format(
                     bucket=data_cfg["sales_raw"]["csv"]["bucket"],
                     key_base=data_cfg["sales_raw"]["csv"]["key_base"],
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
         # Save to parquet
         if not args.no_pq:
-            with Timer(enter_message=f"Uploading parquet data", exit_message="upload csv complete"):
+            with Timer(enter_message=f"Uploading parquet data", exit_message="--> upload csv complete"):
                 output_url = url_template.format(
                     bucket=data_cfg["sales_raw"]["parquet"]["bucket"],
                     key_base=data_cfg["sales_raw"]["parquet"]["key_base"],

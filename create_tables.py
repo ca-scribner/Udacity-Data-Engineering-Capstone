@@ -81,9 +81,9 @@ if __name__ == "__main__":
         port=secrets[args.db]["port"],
     )
 
-    with Timer(enter_message="Dropping existing tables", exit_message="drop complete"):
+    with Timer(enter_message="Dropping existing tables", exit_message="--> drop complete"):
         drop_tables(engine)
 
 
-    with Timer(enter_message="Creating new tables", exit_message="table creation complete"):
+    with Timer(enter_message="Creating new tables", exit_message="--> table creation complete"):
         create_tables(engine)

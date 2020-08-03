@@ -76,8 +76,9 @@ def get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type="postgr
 
 # TODO: REMAKE DOCSTRING
 # (engine, bucket, key, region, source_format, access_key, secret_key):
-def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="postgres"):
+def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="postgres", sales_raw_data_type="csv", ):
     """
+    TODO: REDO THIS DOCSTRING
     Loads all staging tables from S3 source
     
     Includes checks to ensure tables are empty before load and have content after load
@@ -97,8 +98,8 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
     table_name = "staging_sales"
 
     # Find staging files
-    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\tload {table_name} complete"):
-        this_data_cfg = data_cfg[data_sources["sales"]]["csv"]
+    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\t--> load {table_name} complete"):
+        this_data_cfg = data_cfg[data_sources["sales"]][sales_raw_data_type]
         load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
 
     # Stage weather
@@ -108,7 +109,7 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
     test_table_has_no_rows(engine, table_name)
     
     # Load data from all raw weather files
-    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\tload {table_name} complete"):
+    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\t--> load {table_name} complete"):
         this_data_cfg = data_cfg[data_sources["weather"]]
         load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
 
@@ -151,7 +152,7 @@ def insert_check_tables(engine):
     print("Loading and checking production tables")
 
     for table_name, q in insert_table_queries_postgres.items():
-        with Timer(enter_message=f"\tInserting into table {table_name}", exit_message=f"\tinsert into {table_name} complete"):
+        with Timer(enter_message=f"\tInserting into table {table_name}", exit_message=f"\t--> insert into {table_name} complete"):
             load_check_table(engine, table_name, q)
 
 
@@ -167,6 +168,12 @@ def parse_arguments():
         action="store",
         default="postgres",
         help="Name of db credentials in secrets.yaml.  Use this to point at different dbs (postgres, redshift, ...)"
+    )
+    parser.add_argument(
+        '--sales_raw_data_type',
+        default="csv",
+        help="File type to load sales data from.  "
+             "Can be 'csv' for postgres, or either of ('csv', 'parquet') for redshift"
     )
     return parser.parse_args()
 
@@ -218,18 +225,19 @@ if __name__ == "__main__":
         port=secrets[args.db]["port"],
     )
 
-    with Timer(enter_message="Loading staging tables", exit_message="staging table load complete"):
+    with Timer(enter_message="Loading staging tables", exit_message="--> staging table load complete"):
         load_check_staging_tables(
             engine,
             data_sources,
             data_cfg,
             secrets,
-            db_type=args.db
+            db_type=args.db,
+            sales_raw_data_type=args.sales_raw_data_type
         )
 
-    with Timer(enter_message="Inserting data into tables", exit_message="table insert complete"):
+    with Timer(enter_message="Inserting data into tables", exit_message="--> table insert complete"):
         insert_check_tables(engine)
 
-    with Timer(enter_message="Adding zip code to weather stations table", exit_message="add zip complete"):
+    with Timer(enter_message="Adding zip code to weather stations table", exit_message="--> add zip complete"):
         add_zip_to_weather_stations(engine)
 
