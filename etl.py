@@ -1,6 +1,7 @@
 import psycopg2
 import argparse
 from uszipcode import SearchEngine
+import awswrangler as wr
 
 from sql_queries import insert_table_queries_postgres, get_station_latitude_longitude, insert_station_zip, \
     load_staging_queries_postgres, load_staging_queries_redshift
@@ -33,11 +34,11 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
     engine.commit()
 
 
-def get_load_query(table_name, data_cfg, secrets, db_type="postgres"):
+def get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type="postgres"):
     q_settings = dict(
         source_format=data_cfg[f"source_format_{db_type}"],
         bucket=data_cfg["bucket"],
-        key=data_cfg["key"],
+        key=file_to_stage,
         region=data_cfg["region"],
     )
     if db_type == "postgres":
@@ -91,14 +92,27 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
     # Stage sales
     table_name = "staging_sales"
 
-    q = get_load_query(table_name, data_cfg[data_sources["sales"]], secrets, db_type)
+    # Find staging files
+
     with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\tload {table_name} complete"):
-        load_check_table(engine, table_name, q)
+        # Check the staging table is empty before loading
+        test_table_has_no_rows(engine, table_name)
+
+        # Glob all raw files and stage each separately
+        this_data_cfg = data_cfg[data_sources["sales"]]["csv"]
+        print(f"this_data_cfg = {this_data_cfg}")
+        files_to_stage = wr.s3.list_objects(path=f"s3://{this_data_cfg['bucket']}/{this_data_cfg['key_base']}")
+        print(f"files_to_stage = {files_to_stage}")
+
+        for file_to_stage in files_to_stage:
+            q = get_load_query(table_name, this_data_cfg, file_to_stage, secrets, db_type)
+            print(f"q = {q}")
+            load_check_table(engine, table_name, q, check_before=False)
 
     # Stage weather
     table_name = "staging_weather"
 
-    # Check the table is empty before, but only check before the partial loads
+    # Check the table is empty before loading
     test_table_has_no_rows(engine, table_name)
     
     # Load data from all raw weather files
