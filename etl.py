@@ -97,21 +97,9 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
     table_name = "staging_sales"
 
     # Find staging files
-
     with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\tload {table_name} complete"):
-        # Check the staging table is empty before loading
-        test_table_has_no_rows(engine, table_name)
-
-        # Glob all raw files and stage each separately
         this_data_cfg = data_cfg[data_sources["sales"]]["csv"]
-        print(f"this_data_cfg = {this_data_cfg}")
-        files_to_stage = wr.s3.list_objects(path=f"s3://{this_data_cfg['bucket']}/{this_data_cfg['key_base']}")
-        print(f"files_to_stage = {files_to_stage}")
-
-        for file_to_stage in files_to_stage:
-            q = get_load_query(table_name, this_data_cfg, file_to_stage, secrets, db_type)
-            print(f"q = {q}")
-            load_check_table(engine, table_name, q, check_before=False)
+        load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
 
     # Stage weather
     table_name = "staging_weather"
@@ -121,11 +109,34 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
     
     # Load data from all raw weather files
     with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\tload {table_name} complete"):
-        for key in data_cfg[data_sources["weather"]]['key']:
-            this_data_cfg = data_cfg[data_sources["weather"]].copy()
-            this_data_cfg['key'] = key
-            q = get_load_query(table_name, this_data_cfg, secrets, db_type)
-            load_check_table(engine, table_name, q, check_before=False)
+        this_data_cfg = data_cfg[data_sources["weather"]]
+        load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
+
+
+def load_check_from_s3_prefix(data_cfg, db_type, engine, secrets, table_name):
+    """
+    Checks if a staging table is empty then loads data from one or more files specified by an S3 location
+
+    TODO: docstrong
+
+    Args:
+        data_cfg:
+        db_type:
+        engine:
+        secrets:
+        table_name:
+
+    Returns:
+
+    """
+    # Check the staging table is empty before loading
+    test_table_has_no_rows(engine, table_name)
+    # Glob all raw files and stage each separately
+    files_to_stage = wr.s3.list_objects(path=f"s3://{data_cfg['bucket']}/{data_cfg['key_base']}")
+
+    for file_to_stage in files_to_stage:
+        q = get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type)
+        load_check_table(engine, table_name, q, check_before=False)
 
 
 def insert_check_tables(engine):

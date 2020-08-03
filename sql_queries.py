@@ -104,7 +104,6 @@ stores_columns = {
     "store_id": "VARCHAR(4) NOT NULL",
     "store_name": "VARCHAR(50) NOT NULL",
     "zip": "VARCHAR(5) NOT NULL",
-    "store_location": "VARCHAR",
 }
 
 create_stores = f"""

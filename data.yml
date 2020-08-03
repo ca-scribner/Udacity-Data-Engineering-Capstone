@@ -35,13 +35,6 @@ sales_raw_test:
 weather_raw:
     region: us-west-2
     bucket: udacity-de-capstone-182
-    key: 
-    - raw-data/weather/2012.csv
-    - raw-data/weather/2013.csv
-    - raw-data/weather/2014.csv
-    - raw-data/weather/2015.csv
-    - raw-data/weather/2016.csv
-    - raw-data/weather/2017.csv
-    - raw-data/weather/2018.csv
+    key_base: raw-data/weather
     source_format_postgres: (FORMAT CSV, HEADER TRUE)
     source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'YYYY-MM-DD'
