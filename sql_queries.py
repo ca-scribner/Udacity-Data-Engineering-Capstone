@@ -305,37 +305,40 @@ INSERT INTO {weather} (
 )
 """
 
+select_oltp_sales_weather = f"""
+SELECT 
+    t.invoice_id as invoice_id,
+    t.date as date,
+    t.category_id as category_id,
+    t.store_id as store_id,
+    t.total_sale as total_sale,
+    t.precipitation as precipitation,
+    t.snowfall as snowfall
+FROM (
+    SELECT 
+        inv.invoice_id,
+        inv.date,
+        it.category_id,
+        s.store_id,
+        inv.total_sale,
+        w.precipitation,
+        w.snowfall,
+        row_number() over (partition by ws.zip, inv.invoice_id
+                           order by ws.station_id) as rn
+    FROM {invoices} inv
+    JOIN {stores} s ON (s.store_id = inv.store_id)
+    JOIN {items} it ON (it.item_id = inv.item_id)
+    JOIN {product_categories} pc ON (pc.category_id = it.category_id)
+    JOIN {weather_stations} ws ON (ws.zip = s.zip)
+    JOIN {weather} w ON w.station_id = ws.station_id AND w.date = inv.date
+    ORDER BY ws.zip, ws.station_id, inv.invoice_id
+) t
+WHERE rn = 1
+"""
 
 insert_olap_sales_weather = f"""
 INSERT INTO {olap_sales_weather} (
-    SELECT 
-        t.invoice_id as invoice_id,
-        t.date as date,
-        t.category_id as category_id,
-        t.store_id as store_id,
-        t.total_sale as total_sale,
-        t.precipitation as precipitation,
-        t.snowfall as snowfall
-    FROM (
-        SELECT 
-            inv.invoice_id,
-            inv.date,
-            it.category_id,
-            s.store_id,
-            inv.total_sale,
-            w.precipitation,
-            w.snowfall,
-            row_number() over (partition by ws.zip, inv.invoice_id
-                               order by ws.station_id) as rn
-        FROM invoices inv
-        JOIN stores s ON (s.store_id = inv.store_id)
-        JOIN items it ON (it.item_id = inv.item_id)
-        JOIN product_categories pc ON (pc.category_id = it.category_id)
-        JOIN weather_stations ws ON (ws.zip = s.zip)
-        JOIN weather w ON w.station_id = ws.station_id AND w.date = inv.date
-        ORDER BY ws.zip, ws.station_id, inv.invoice_id
-    ) t
-    WHERE rn = 1
+    {select_oltp_sales_weather}
     ORDER BY t.invoice_id
 )
 """
@@ -438,3 +441,25 @@ FROM (
 WHERE {weather_stations}.station_id=selected.station_id
 """
 
+# Analytical queries
+select_olap_sales_vs_weather = f"""
+SELECT
+    invoice_id,
+    date,
+    category_id,
+    store_id,
+    total_sale,
+    precipitation,
+    snowfall
+FROM {olap_sales_weather}
+"""
+
+analytical_queries = {
+    "OLTP: sales vs weather": select_oltp_sales_weather,
+    "OLAP: sales vs weather": select_olap_sales_vs_weather,
+}
+
+# Misc helper queries
+
+# very simple query used during performance testing to make sure there's no first-query-lag in timing
+discardable_query = f"""SELECT * FROM {staging_sales} LIMIT 1"""
