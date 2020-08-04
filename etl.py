@@ -120,15 +120,16 @@ def load_check_from_s3_prefix(data_cfg, db_type, engine, secrets, table_name):
     # Check the staging table is empty before loading
     test_table_has_no_rows(engine, table_name)
     # Glob all raw files and stage each separately
-    path=f"s3://{data_cfg['bucket']}/{data_cfg['key_base']}"
+    path = f"s3://{data_cfg['bucket']}/{data_cfg['key_base']}"
     files_to_stage = wr.s3.list_objects(path=path)
 
     if len(files_to_stage) == 0:
         raise ValueError(f"Found no files to load for {table_name} in {path}")
 
     for file_to_stage in files_to_stage:
-        q = get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type)
-        load_check_table(engine, table_name, q, check_before=False)
+        with Timer(enter_message=f"\t\tstaging file .../{file_to_stage.split('/')[-1]}", exit_message="\t\t--> "):
+            q = get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type)
+            load_check_table(engine, table_name, q, check_before=False)
 
 
 def insert_check_tables(engine):

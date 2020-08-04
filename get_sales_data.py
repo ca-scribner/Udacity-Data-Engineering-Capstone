@@ -6,6 +6,10 @@ import awswrangler as wr
 from utilities import load_settings, Timer
 from sql_queries import staging_sales_columns
 
+
+DEFAULT_LIMIT = 1000000
+
+
 # Map between the names used in this app and the original data source names
 SALES_NAME_MAP_APP_TO_SOURCE = {
     "invoice_id": 'invoice_line_no',
@@ -66,7 +70,8 @@ def parse_args():
     parser.add_argument(
         '--limit',
         action='store',
-        help='Maximum number of records requested per month'
+        default=DEFAULT_LIMIT,
+        help=f'Maximum number of records requested per month (default: {DEFAULT_LIMIT}'
     )
     parser.add_argument(
         '--action_on_limit',
