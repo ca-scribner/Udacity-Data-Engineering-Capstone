@@ -125,6 +125,7 @@ if __name__ == "__main__":
                 raise ValueError("Error: Download limit reached and invalid action_on_limit specified "
                                  f"({args.action_on_limit})")
         df = pd.DataFrame(results).rename(columns=SALES_NAME_MAP_SOURCE_TO_APP)
+        df['date'] = pd.to_datetime(df['date'], yearfirst=True)
         url_template = f's3://{{bucket}}/{{key_base}}/{start_date.year:02d}/{start_date.month:02d}/{start_date.year:04d}-{start_date.month:02d}{{suffix}}'
 
         # Save to csv

@@ -5,7 +5,7 @@ sales_raw:
         key_base: raw-data/sales/csv
         suffix: -sales.csv
         source_format_postgres: (FORMAT CSV, HEADER TRUE)
-        source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'MM/DD/YYYY'
+        source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'YYYY-MM-DD'
 
     parquet:
         region: us-west-2
@@ -21,7 +21,7 @@ sales_raw_test:
         key_base: raw-data/sales_test/csv
         suffix: -sales.csv
         source_format_postgres: (FORMAT CSV, HEADER TRUE)
-        source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'MM/DD/YYYY'
+        source_format_redshift: CSV delimiter ',' IGNOREHEADER 1 DATEFORMAT 'YYYY-MM-DD'
 
     parquet:
         region: us-west-2

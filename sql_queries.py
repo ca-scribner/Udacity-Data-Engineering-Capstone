@@ -205,7 +205,6 @@ COPY {table_name}
 FROM 's3://{{bucket}}/{{key}}' 
 IAM_ROLE '{{iam}}' 
 {{source_format}} 
-REGION '{{region}}' 
 COMPUPDATE OFF STATUPDATE OFF
 """
 
