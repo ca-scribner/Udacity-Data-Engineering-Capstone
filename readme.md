@@ -2,7 +2,7 @@
 
 # Project: Data Warehouse
 
-This project explores the use of AWS' managed Postgres and Redshift database services using [Iowa liquor sales data](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy) joined with [NOAA weather data](https://www.ncdc.noaa.gov/cdo-web/) in Iowa.  The objectives are to learn more of how these two offerings behave for both an OLTP and OLAP workflow where users are trying to derive insights from the relation between liquor sales and weather patterns (such as snowfall and rainfall).  In particular, this will be explored from the perspective of a user who needs to support both a source of truth (must have access to in-sync data, although this access need not be fully performant and could be infrequent) and analytics workflows (such as for a dashboard or machine learning use cases).
+This project explores the use of AWS' managed Postgres and Redshift database services using [Iowa liquor sales data](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy) joined with [NOAA weather data](https://www.ncdc.noaa.gov/cdo-web/).  The objectives are to better understand how these two offerings behave for both OLTP (regularly loading new data into a source of truth database) and OLAP (extracting insights that may span multiple tables) workflows.  In general, the objectives with this data are to derive insights regarding the liquor sales data, such as investigating monthly liquor sales by store or the relation between liquor sales and weather patterns (such as snowfall and rainfall).  In particular, this will be explored from the perspective of a user who needs to support both a source of truth (must have access to in-sync data, although this access need not be fully performant and could be infrequent) and analytics workflows (such as for a dashboard or machine learning use cases).
 
 TO ADD: 
 * explore and assess data, before schema?
@@ -12,62 +12,77 @@ TO ADD:
 The source data used here are:
 
 * Iowa Liquor Sales:
-    *   This data set has liquor sales for all stores across Iowa, summed by day.  The data is accessible through an API   
-    *   Source: Obtained directly by API as described [here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy)
-    *   Fields used here include:
-        * invoice_id
-        * date
-        * store_id / name
-        * store zip code
-        * item category / name
-        * total_sale
 * National Oceanic and Atmospheric Administration weather data:
-    *   This data includes daily weather reports for all the weather stations in the state of Iowa
-    *   Source: Loaded into S3 manually using CSV files obtained by request from [here](https://www.ncdc.noaa.gov/cdo-web/)
-    * Fields used here include:
-        * weather station id
-        * weather station latitude and longitude (converted to zip using the `uszipcode` search engine)
-        * daily precipitation
-        * daily snowfall
 
-# Data exploration
+The exploration of these datasets is described below
 
-## Iowa Liquor Sales
+## Iowa Liquor Sales:
 
-TODO
+The [Iowa Liquor sales data](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy) includes per-sale invoice records for liquor sales across Iowa, including the item sold, location sold from, and value of sale.  The data spans sales from 2012 to 2018 and is accessible through CSV download or interaction with the Socrata API.  The API has been used here, automated through scripts that request monthly data.  Initial data exploration was done using a subset of the data to estimate types/sizes, then these estimates were used to ingest the entire dataset.  
 
-## NOAA Weather Data
+Key data fields include:
 
-TODO
+* invoice_id: unique, constant 16 character length, and does not contain nulls
+* date: ranges from 2012-01 to 2018-04 and does not contain nulls
+* store id: 4 digit ID and does not contain nulls 
+* store zip code: 5 digit ID and does not contain nulls
+* item category id: 9 digit numeric ID and and contains nulls
+* category name: <50 character text field that contains nulls
+* bottle cost, bottle retail, and total sale value: numeric and may contain nulls.  Staged as text to avoid rounding and to allow their final destination to choose precision
 
+The staged raw CSV and parquet data are hosted publicly in `udacity-de-capstone-182/raw-data/sales/`.
+
+Note also that some fields which have ID and name components (for example, category id and category name) do not necessarily have the same unique counts.  Their definitions have changed over time (for example, Category ABC might be renamed to Category XYZ, but still use the same ID=1).  Because of this the strategy used here is to resolve any conflicts between ID and name by using the most recent naming convention from the raw data (for example, if in 2012 Category 1 had name ABC but in 2018 Category 1 had name XYZ, we use XYZ).
+
+## National Oceanic and Atmospheric Administration weather data:
+
+The [National Oceanic and Atmospheric Administration weather data](https://www.ncdc.noaa.gov/cdo-web/) includes daily weather summaries from all weather stations in the state of Iowa, including latitude/longitude of the station and the daily precipitation and snowfall totals for that location.  This data was obtained by manual request from the source as yearly CSV files and loaded into S3 manually. 
+
+Key data fields include:
+* weather station id: 11 character unique station ID that does not contain nulls
+* date: collected for 2012-2018, does not contain nulls
+* weather station latitude and longitude: described as a point
+* daily precipitation: decimal value, may contain nulls
+* daily snowfall: decimal value, may contain nulls
+
+The staged raw CSV data is hosted publicly in `udacity-de-capstone-182/raw-data/weather/`.
+
+# ETL Strategy
+
+The same ETL process was applied for both Postgres and Redshift implementations.  This process took the following steps:
+
+* Store raw data:
+    * (by human interaction): Transfer NOAA Iowa weather data for 2012-2018 to AWS S3, stored as yearly CSV files
+    * (`get_sales_data.py`): Collect Iowa Liquor Sales data from Socrata API and transfer to AWS S3, grabbed and stored as monthly CSV and parquet files
+* Stage raw data in staging tables:
+    * (`create_tables.py`): (Drop and) Create all staging, OLTP, and OLAP tables
+    * (`etl.py`): Load staging data from S3 CSV to database
+* Copy staged data to OLTP tables:
+    * (`etl.py`): Select/insert data from staging tables into OLTP tables in the schema described below
+    * (`etl.py`): Enrich weather station data by adding zip code, computed using the `uszipcode` zip code search engine
+* (`etl.py`): Copy OLTP data to OLAP schemas:
+ 
 # Analytics objectives
 
 TODO
 
 # Database Schema
+
+## OLTP Schema
+
+The OLTP database had the following schema:
+
+![OLTP Database Schema](./images/oltp.png)
+
+The database centers on a fact table which includes transaction data (`bottle_cost`, `total_sale`) and references to other tables for store and item details.  The goal here is a Third Normal Form schema with no redundancy, but this causes complications when trying to relate properties like an item category with the store that sells it as they require multiple joins.  In the case of aggregating liquor sales by category and comparing to weather data, five joins are required.
+
+## OLAP Schemas
+
+The OLAP database has the following schemas:
+
+![OLAP Database Schema]()
+
 TODO
-The database is broken into the following tables:
-
-Fact Table:
-
-songplays - each record corresponds to a song play event, defined by page==NextSong, in the log_data. Columns included in this table are: songplay_id, start_time, user_id, level, song_id, artist_id, session_id, location, and user_agent
-Dimension Tables:
-
-users - users in the app: user_id, first_name, last_name, gender, and level
-songs - songs in music database: song_id, title, artist_id, year, and duration
-artists - artists in music database: artist_id, name, location, latitude, and longitude
-time - timestamps of records in songplays broken down into specific units: start_time, hour, day, week, month, year, and weekday
-The above schema prioritizes the goal of the workflow, analyzing song play analysis, by centering the schema on the songplay fact table. This tries to minimize the JOIN statements required to analyze data related to song plays. For example:
-
-* ETL requirements
-* Data quality checks
-* Data dictionary
-
-# ETL Strategy
-
-The ETL process for loading took the following steps:
-* (by human interaction): Transfer NOAA Iowa weather data for 2012-2018 to AWS S3, stored as yearly CSV files 
-* (`get_sales_data.py`): Collect Iowa Liquor Sales data from API and transfer to AWS S3, stored as monthly CSV or parquet files
 
 # Table Optimization
 
@@ -81,39 +96,86 @@ Without foreknowledge about the workflow and data, Redshift's default optimizati
 
 If more detail on the potential data/workflow was known, a distribution strategy might be available that co-locates commonly joined information. For example, assuming the songplay and user tables are both expected to be large and often joined, while the song, and artist tables are expected to be small (and edited less often), it could make sense to distribute the songplay and user tables by key with user_id and the song and artist tables by all. Similarly, sorting could be defined based on expected workloads.
 
-# Repository Contents
-
-TODO: 
+# Repository Contents and Run Instructions
 
 Included in the repository are:
 
-definitions of all sql queries required for table creation, table dropping, and common data insert/select
-See sql_queries.py. Intent is for this to be imported as utilities by other tools. Not meant to run standalone
-table creation script which reinitializes the database, removing any existing tables and creating fresh ones
-python create_tables.py
-the etl process, which takes raw data and puts that data into an existing db
-python etl.py
-Metadata such as DB connection information, IAM role, and source data location in S3
-See dwh.cfg for most details
-Run Instructions
-To run the full ETL process, use:
+* `get_sales_data.py`: Fetches monthly sales data from public API and store in S3
+    *  see `-h` for more details
+    *  example: `python get_sales_data.py 2012-01 2018-12 --data_spec sales_raw`
+* `create_tables.py`: (Drops and) Creates tables for the database
+    *  see `-h` for more details
+    *  example: `python create_tables.py --db postgres`
+* `etl.py`: Performs ETL from raw --> staged --> OLTP database
+    *  see `-h` for more details
+    *  example: `python etl.py --db postgres`
+* `etl_olap.py`: Performs ETL from OLTP --> OLAP
+    *  see `-h` for more details
+    *  example: `python etl_olap.py --db postgres`
+* `sql_queries.py`: Definitions of all SQL queries 
+* `utilities.py`: Shared utilities used throughout the code
+* `data.yml`: Definition of metadata for the data sources
+* `secrets.yml`: Not included in the repository, but should contain data of the form:
+    ````yaml
+    postgres:
+        database:
+        host:
+        port:
+        user:
+        password:
+    
+    aws:
+        access_key:
+        secret_key:
+    
+    redshift:
+        database:
+        host:
+        port:
+        user:
+        password:
+        arn:
+    
+    socrata:
+        access_key:
+        secret_key:
+    ````
 
-python create_tables.py
-python etl.py
+# Analytics Comparisons
 
-# Run instructions
-
-TODO
+* Compare between OLTP and OLAP for load and select
+* Compare between pg and rs
 
 # Comparison between Postgres and Redshift
 
 (for this use case)
 
+# Project Questions:
+
+## Clearly state the rationale for the choice of tools and technologies for the project.
+
+TODO
+
+## Propose how often the data should be updated and why.
+
+Given the nature of the data sources, the current system need only be updated whenever new liquor sales data is added to the database (current dissemination of data lags by ~2 years).  If this was an in-house data source that had frequent updates, the answer to this would depend on what the usage of the data required.  If this was used to provide frequent summary of the sales, etc., ETL of new data would need to be at least as frequent as the analyses (if analysis is daily, ETL needs to be <= daily).    
+
+## Write a description of how you would approach the problem differently under the following scenarios:
+
+TODO
+
+### The data was increased by 100x.
+
+TODO
+
+### The data populates a dashboard that must be updated on a daily basis by 7am every day.
+
+TODO
+
+### The database needed to be accessed by 100+ people.
+
+TODO
+
 # Recommendations and Conclusions
 
-* Clearly state the rationale for the choice of tools and technologies for the project.
-* Propose how often the data should be updated and why.
-* Write a description of how you would approach the problem differently under the following scenarios:
-     * The data was increased by 100x.
-     * The data populates a dashboard that must be updated on a daily basis by 7am every day.
-     * The database needed to be accessed by 100+ people.
+TODO:
