@@ -1,22 +1,44 @@
-# At least two data sources/formats (csv, api, json)
-
-
-
 # Udacity Data Engineering Nanodegree
 
 # Project: Data Warehouse
 
-This project explores the use of AWS' managed Postgres and Redshift database services using [Iowa liquor sales data]() joined with [weather data]().  The objectives are to learn more of how these two offerings behave for both an OLTP and OLAP workflow.  In particular, this will be explored from the perspective of a user who needs to support both a source of truth (must have access to in-sync data, although this access need not be fully performant and could be infrequent) and analytics workflows (such as for a dashboard or machine learning use cases).
+This project explores the use of AWS' managed Postgres and Redshift database services using [Iowa liquor sales data](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy) joined with [NOAA weather data](https://www.ncdc.noaa.gov/cdo-web/) in Iowa.  The objectives are to learn more of how these two offerings behave for both an OLTP and OLAP workflow where users are trying to derive insights from the relation between liquor sales and weather patterns (such as snowfall and rainfall).  In particular, this will be explored from the perspective of a user who needs to support both a source of truth (must have access to in-sync data, although this access need not be fully performant and could be infrequent) and analytics workflows (such as for a dashboard or machine learning use cases).
 
 TO ADD: 
 * explore and assess data, before schema?
 
 # Source Data
-TODO
-The source data is broken into two sets of JSON formatted files:
 
-log_data: log files partitioned by month and year and defined by a JSON schema file. Each file contains multiple rows identifying songs played on the platform, including information such as artist name, user information, song information, and timestamps
-song_data: one song per file, describing artist and song information. Files are spread across subdirectories in a specified location.
+The source data used here are:
+
+* Iowa Liquor Sales:
+    *   This data set has liquor sales for all stores across Iowa, summed by day.  The data is accessible through an API   
+    *   Source: Obtained directly by API as described [here](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy)
+    *   Fields used here include:
+        * invoice_id
+        * date
+        * store_id / name
+        * store zip code
+        * item category / name
+        * total_sale
+* National Oceanic and Atmospheric Administration weather data:
+    *   This data includes daily weather reports for all the weather stations in the state of Iowa
+    *   Source: Loaded into S3 manually using CSV files obtained by request from [here](https://www.ncdc.noaa.gov/cdo-web/)
+    * Fields used here include:
+        * weather station id
+        * weather station latitude and longitude (converted to zip using the `uszipcode` search engine)
+        * daily precipitation
+        * daily snowfall
+
+# Data exploration
+
+## Iowa Liquor Sales
+
+TODO
+
+## NOAA Weather Data
+
+TODO
 
 # Analytics objectives
 
@@ -40,6 +62,12 @@ The above schema prioritizes the goal of the workflow, analyzing song play analy
 * ETL requirements
 * Data quality checks
 * Data dictionary
+
+# ETL Strategy
+
+The ETL process for loading took the following steps:
+* (by human interaction): Transfer NOAA Iowa weather data for 2012-2018 to AWS S3, stored as yearly CSV files 
+* (`get_sales_data.py`): Collect Iowa Liquor Sales data from API and transfer to AWS S3, stored as monthly CSV or parquet files
 
 # Table Optimization
 

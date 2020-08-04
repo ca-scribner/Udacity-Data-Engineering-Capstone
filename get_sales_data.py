@@ -129,11 +129,12 @@ if __name__ == "__main__":
 
         # Save to csv
         if not args.no_csv:
+            this_data_cfg = data_cfg[args.data_spec]["csv"]
             with Timer(enter_message=f"Uploading csv data", exit_message="--> upload csv complete"):
                 output_url = url_template.format(
-                    bucket=data_cfg["sales_raw"]["csv"]["bucket"],
-                    key_base=data_cfg["sales_raw"]["csv"]["key_base"],
-                    suffix=data_cfg["sales_raw"]["csv"]["suffix"]
+                    bucket=this_data_cfg["bucket"],
+                    key_base=this_data_cfg["key_base"],
+                    suffix=this_data_cfg["suffix"]
                 )
 
                 # Could partition this data further (daily files)
@@ -146,11 +147,12 @@ if __name__ == "__main__":
 
         # Save to parquet
         if not args.no_pq:
+            this_data_cfg = data_cfg[args.data_spec]["parquet"]
             with Timer(enter_message=f"Uploading parquet data", exit_message="--> upload csv complete"):
                 output_url = url_template.format(
-                    bucket=data_cfg["sales_raw"]["parquet"]["bucket"],
-                    key_base=data_cfg["sales_raw"]["parquet"]["key_base"],
-                    suffix=data_cfg["sales_raw"]["parquet"]["suffix"]
+                    bucket=this_data_cfg["bucket"],
+                    key_base=this_data_cfg["key_base"],
+                    suffix=this_data_cfg["suffix"]
                 )
 
                 # Could partition this data further (daily files)
@@ -158,6 +160,7 @@ if __name__ == "__main__":
                     df=df,
                     path=output_url,
                     s3_additional_kwargs=s3_additional_kwargs,
-                    compression=data_cfg["sales_raw"]["parquet"]["compression"],
+                    # compression=this_data_cfd["compression"],  # psycopg2 does not support copy redshift from
+                                                                 # compressed parquet
                     index=False,  # Do not export empty index column
                 )

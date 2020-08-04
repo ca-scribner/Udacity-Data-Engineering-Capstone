@@ -11,9 +11,8 @@ sales_raw:
         region: us-west-2
         bucket: udacity-de-capstone-182
         key_base: raw-data/sales/parquet
-        suffix: -sales.parquet.gz
+        suffix: -sales.parquet
         source_format_redshift: FORMAT AS PARQUET
-        compression: gzip
 
 sales_raw_test:
     csv:
@@ -28,9 +27,8 @@ sales_raw_test:
         region: us-west-2
         bucket: udacity-de-capstone-182
         key_base: raw-data/sales_test/parquet
-        suffix: -sales.parquet.gz
+        suffix: -sales.parquet
         source_format_redshift: FORMAT AS PARQUET
-        compression: gzip
 
 weather_raw:
     region: us-west-2

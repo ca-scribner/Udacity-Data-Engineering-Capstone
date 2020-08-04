@@ -59,19 +59,6 @@ def get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type="postgr
     }
     q = staging_query_map[db_type][table_name]
     return q.format(**q_settings)
-#
-#
-# def get_load_query(q, data_cfg, secrets, source_format_key="source_format"):
-#     q = load_staging_queries[table_name]
-#     q_settings = dict(
-#         source_format=data_cfg[source_format_key],
-#         bucket=data_cfg["bucket"],
-#         key=data_cfg["key"],
-#         region=data_cfg["region"],
-#         access_key=secrets["aws"]["access_key"],
-#         secret_key=secrets["aws"]["secret_key"],
-#     )
-#     return q.format(**q_settings)
 
 
 # TODO: REMAKE DOCSTRING
@@ -133,7 +120,11 @@ def load_check_from_s3_prefix(data_cfg, db_type, engine, secrets, table_name):
     # Check the staging table is empty before loading
     test_table_has_no_rows(engine, table_name)
     # Glob all raw files and stage each separately
-    files_to_stage = wr.s3.list_objects(path=f"s3://{data_cfg['bucket']}/{data_cfg['key_base']}")
+    path=f"s3://{data_cfg['bucket']}/{data_cfg['key_base']}"
+    files_to_stage = wr.s3.list_objects(path=path)
+
+    if len(files_to_stage) == 0:
+        raise ValueError(f"Found no files to load for {table_name} in {path}")
 
     for file_to_stage in files_to_stage:
         q = get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type)
