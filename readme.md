@@ -147,7 +147,7 @@ Included in the repository are:
 * Compare between pg and rs
 
 # Comparison between Postgres and Redshift
-
+s
 (for this use case)
 
 # Project Questions:
