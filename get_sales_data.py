@@ -18,7 +18,7 @@ SALES_NAME_MAP_APP_TO_SOURCE = {
     "store_name": 'name',
     "address": 'address',
     "city": 'city',
-    "zip": 'zipcode',
+    "zipcode": 'zipcode',
     "store_location": 'store_location',
     "county_number": 'county_number',
     "county": 'county',

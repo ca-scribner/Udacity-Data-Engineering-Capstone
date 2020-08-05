@@ -82,6 +82,7 @@ CREATE TABLE {staging_weather} (
 """
 
 staging_population_columns = {
+    "YEAR": "INTEGER",
     "population": "INTEGER",
     "minimum_age": "INTEGER",
     "maximum_age": "INTEGER",

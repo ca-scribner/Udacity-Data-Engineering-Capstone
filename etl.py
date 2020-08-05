@@ -89,16 +89,13 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
         this_data_cfg = data_cfg[data_sources["sales"]][sales_raw_data_type]
         load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
 
-    # Stage weather
-    table_name = "staging_weather"
-
-    # Check the table is empty before loading
-    test_table_has_no_rows(engine, table_name)
-    
-    # Load data from all raw weather files
-    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\t--> load {table_name} complete"):
-        this_data_cfg = data_cfg[data_sources["weather"]]
-        load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
+    # Stage weather/population
+    for case_name in ["weather", "population"]:
+        table_name = f"staging_{case_name}"
+        # Load data from all raw files
+        with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\t--> load {table_name} complete"):
+            this_data_cfg = data_cfg[data_sources[case_name]]
+            load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
 
 
 def load_check_from_s3_prefix(data_cfg, db_type, engine, secrets, table_name):
@@ -203,6 +200,7 @@ if __name__ == "__main__":
     data_sources = {
         'sales': 'sales_raw',
         'weather': 'weather_raw',
+        'population': 'population_raw',
     }
     if args.test:
         data_sources['sales'] = data_sources['sales'] + "_test"
