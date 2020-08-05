@@ -1,14 +1,16 @@
-staging_sales = "staging_sales"
-staging_weather = "staging_weather"
-staging_population = "staging_population"
-
 invoices = "invoices"
 items = "items"
+population = "population"
 product_categories = "product_categories"
 stores = "stores"
 weather = "weather"
 weather_stations = "weather_stations"
-olap_sales_weather = "fact_weather_sales"
+
+staging_sales = "staging_sales"
+staging_weather = f"staging_{weather}"
+staging_population = f"staging_{population}"
+
+olap_sales_weather = f"fact_{weather}_sales"
 
 count_rows = """
 SELECT COUNT(*) from {table_name}
@@ -20,6 +22,7 @@ DROP TABLE IF EXISTS {table_name}
 
 drop_invoices = drop.format(table_name=invoices)
 drop_items = drop.format(table_name=items)
+drop_population = drop.format(table_name=population)
 drop_product_categories = drop.format(table_name=product_categories)
 drop_stores = drop.format(table_name=stores)
 drop_weather = drop.format(table_name=weather)
@@ -82,7 +85,7 @@ CREATE TABLE {staging_weather} (
 """
 
 staging_population_columns = {
-    "YEAR": "INTEGER",
+    "year": "INTEGER",
     "population": "INTEGER",
     "minimum_age": "INTEGER",
     "maximum_age": "INTEGER",
@@ -186,6 +189,19 @@ create_weather_stations = f"""
 CREATE TABLE {weather_stations} (
   {", ".join(f"{name} {spec}" for name, spec in weather_stations_columns.items())},
   PRIMARY KEY (station_id)
+)
+"""
+
+population_columns = {
+    "year": "INTEGER",
+    "zipcode": "VARCHAR(5)",
+    "population": "INTEGER",
+}
+
+create_population = f"""
+CREATE TABLE {population} (
+  {", ".join(f"{name} {spec}" for name, spec in population_columns.items())},
+  PRIMARY KEY (year, zipcode)
 )
 """
 
@@ -323,6 +339,17 @@ INSERT INTO {weather} (
 )
 """
 
+insert_population = f"""
+INSERT INTO {population} (
+    SELECT 
+        {", ".join(population_columns)}
+    FROM {staging_population}
+    WHERE minimum_age IS NULL
+      AND maximum_age IS NULL 
+      AND gender IS NULL
+)
+"""
+
 select_oltp_sales_weather = f"""
 SELECT 
     t.invoice_id as invoice_id,
@@ -368,12 +395,13 @@ create_staging_table_queries = {
 }
 
 create_table_queries = {
-    product_categories: create_product_categories, 
+    product_categories: create_product_categories,
     items: create_items,
     stores: create_stores,
     invoices: create_invoices,
     weather_stations: create_weather_stations,
     weather: create_weather,
+    population: create_population,
 }
 
 create_olap_table_queries = {
@@ -393,6 +421,7 @@ drop_table_queries = {
     product_categories: drop_product_categories, 
     weather: drop_weather,
     weather_stations: drop_weather_stations,
+    population: drop_population,
 }
 
 drop_olap_table_queries = {
@@ -418,6 +447,7 @@ insert_table_queries_postgres = {
     invoices: insert_invoices,
     weather_stations: insert_weather_stations,
     weather: insert_weather,
+    population: insert_population,
 }
 
 insert_olap_table_queries = {
