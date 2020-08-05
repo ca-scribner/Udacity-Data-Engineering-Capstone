@@ -3,7 +3,7 @@ import argparse
 from uszipcode import SearchEngine
 import awswrangler as wr
 
-from sql_queries import insert_table_queries_postgres, get_station_latitude_longitude, insert_station_zip, \
+from sql_queries import insert_table_queries_postgres, get_station_latitude_longitude, insert_station_zipcode, \
     load_staging_queries_postgres, load_staging_queries_redshift
 from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip, load_settings, Timer
 
@@ -188,7 +188,7 @@ def add_zip_to_weather_stations(engine):
     # Values in format needed for sql (series of "(stn_id, zip), (stn_id, zip), ...")
     values = ", ".join([str(r) for r in zipcode_records])
 
-    insert_query = insert_station_zip.format(values=values)
+    insert_query = insert_station_zipcode.format(values=values)
 
     cur.execute(insert_query)
     engine.commit()

@@ -1,5 +1,6 @@
 staging_sales = "staging_sales"
 staging_weather = "staging_weather"
+staging_population = "staging_population"
 
 invoices = "invoices"
 items = "items"
@@ -28,7 +29,7 @@ drop_olap_sales_weather = drop.format(table_name=olap_sales_weather)
 
 drop_staging_sales = drop.format(table_name=staging_sales)
 drop_staging_weather = drop.format(table_name=staging_weather)
-
+drop_staging_population = drop.format(table_name=staging_population)
 staging_sales_columns = {
     "invoice_id": "VARCHAR NOT NULL",
     "date": "DATE NOT NULL",
@@ -36,7 +37,7 @@ staging_sales_columns = {
     "store_name": "VARCHAR NOT NULL",
     # "address": "VARCHAR NOT NULL",
     # "city": "VARCHAR NOT NULL",
-    "zip": "VARCHAR NOT NULL",
+    "zipcode": "VARCHAR NOT NULL",
     # "store_location": "VARCHAR",
     # "county_number": "DECIMAL",
     # "county": "VARCHAR",
@@ -80,6 +81,21 @@ CREATE TABLE {staging_weather} (
 )
 """
 
+staging_population_columns = {
+    "population": "INTEGER",
+    "minimum_age": "INTEGER",
+    "maximum_age": "INTEGER",
+    "gender": "VARCHAR(6)",
+    "zipcode": "VARCHAR(5)",
+    "geo_id": "VARCHAR(14)",
+}
+
+create_staging_population = f"""
+CREATE TABLE {staging_population} (
+  {", ".join(f"{name} {spec}" for name, spec in staging_population_columns.items())}
+)
+"""
+
 invoices_columns = {
     "invoice_id": "VARCHAR(16) NOT NULL",
     "store_id": "VARCHAR(4) NOT NULL",
@@ -103,7 +119,7 @@ CREATE TABLE {invoices} (
 stores_columns = {
     "store_id": "VARCHAR(4) NOT NULL",
     "store_name": "VARCHAR(50) NOT NULL",
-    "zip": "VARCHAR(5) NOT NULL",
+    "zipcode": "VARCHAR(5) NOT NULL",
 }
 
 create_stores = f"""
@@ -162,7 +178,7 @@ weather_stations_columns = {
     "name": "VARCHAR(50) NOT NULL",
     "latitude": "VARCHAR(17) NOT NULL",
     "longitude": "VARCHAR(17) NOT NULL",
-    "zip": "VARCHAR(5)",
+    "zipcode": "VARCHAR(5)",
 }
 
 create_weather_stations = f"""
@@ -199,6 +215,7 @@ SELECT aws_s3.table_import_from_s3(
 
 load_staging_sales_postgres = load_staging_postgres.format(table_name=staging_sales)
 load_staging_weather_postgres = load_staging_postgres.format(table_name=staging_weather)
+load_staging_population_postgres = load_staging_postgres.format(table_name=staging_population)
 
 load_staging_redshift = """
 COPY {table_name} 
@@ -210,6 +227,7 @@ COMPUPDATE OFF STATUPDATE OFF
 
 load_staging_sales_redshift = load_staging_redshift.format(table_name=staging_sales)
 load_staging_weather_redshift = load_staging_redshift.format(table_name=staging_weather)
+load_staging_population_redshift = load_staging_redshift.format(table_name=staging_population)
 
 # Query template to get a distinct row for each group that is generic across postgres and redshift
 select_distinct = """
@@ -279,8 +297,7 @@ AND total_sale IS NOT NULL
     source_table=staging_sales
 )
 
-
-this_weather_stations_columns = [x for x in weather_stations_columns.keys() if x != "zip"]
+this_weather_stations_columns = [x for x in weather_stations_columns.keys() if x != "zipcode"]
 
 insert_weather_stations = insert_distinct.format(
     table_name=weather_stations,
@@ -323,15 +340,15 @@ FROM (
         inv.total_sale,
         w.precipitation,
         w.snowfall,
-        row_number() over (partition by ws.zip, inv.invoice_id
+        row_number() over (partition by ws.zipcode, inv.invoice_id
                            order by ws.station_id) as rn
     FROM {invoices} inv
     JOIN {stores} s ON (s.store_id = inv.store_id)
     JOIN {items} it ON (it.item_id = inv.item_id)
     JOIN {product_categories} pc ON (pc.category_id = it.category_id)
-    JOIN {weather_stations} ws ON (ws.zip = s.zip)
+    JOIN {weather_stations} ws ON (ws.zipcode = s.zipcode)
     JOIN {weather} w ON w.station_id = ws.station_id AND w.date = inv.date
-    ORDER BY ws.zip, ws.station_id, inv.invoice_id
+    ORDER BY ws.zipcode, ws.station_id, inv.invoice_id
 ) t
 WHERE rn = 1
 """
@@ -346,6 +363,7 @@ INSERT INTO {olap_sales_weather} (
 create_staging_table_queries = {
     staging_sales: create_staging_sales,
     staging_weather: create_staging_weather,
+    staging_population: create_staging_population,
 }
 
 create_table_queries = {
@@ -364,6 +382,7 @@ create_olap_table_queries = {
 drop_staging_table_queries = {
     staging_sales: drop_staging_sales,
     staging_weather: drop_staging_weather,
+    staging_population: drop_staging_population,
 }
 
 drop_table_queries = {
@@ -382,13 +401,14 @@ drop_olap_table_queries = {
 load_staging_queries_postgres = {
     staging_sales: load_staging_sales_postgres,
     staging_weather: load_staging_weather_postgres,
+    staging_population: load_staging_population_postgres,
 }
 
 load_staging_queries_redshift = {
     staging_sales: load_staging_sales_redshift,
     staging_weather: load_staging_weather_redshift,
+    staging_population: load_staging_population_redshift,
 }
-
 
 insert_table_queries_postgres = {
     product_categories: insert_product_categories, 
@@ -409,34 +429,34 @@ SELECT station_id, latitude, longitude FROM {weather_stations}
 WHERE 
     latitude IS NOT NULL 
     AND longitude IS NOT NULL 
-    AND zip IS NULL 
+    AND zipcode IS NULL 
 """
 
 # # Could use this for postgres, but redshift does not support update from values.  Use common syntax below
-# insert_station_zip_POSTGRES = f"""
+# insert_station_zipcode_POSTGRES = f"""
 # UPDATE {weather_stations} AS ws SET
-#   zip = new.zip
+#   zipcode = new.zipcode
 # FROM (VALUES
 #   {{values}}
-# ) as new(station_id, zip)
+# ) as new(station_id, zipcode)
 # where ws.station_id = new.station_id
 # """
 
-insert_station_zip = f"""
-CREATE TEMPORARY TABLE new_zips (
+insert_station_zipcode = f"""
+CREATE TEMPORARY TABLE new_zipcodes (
   station_id VARCHAR(11) NOT NULL, 
-  zip VARCHAR(5)
+  zipcode VARCHAR(5)
 );
-INSERT INTO new_zips
+INSERT INTO new_zipcodes
 VALUES
     {{values}}
 ;
 UPDATE {weather_stations} 
-SET zip=selected.zip
+SET zipcode=selected.zipcode
 FROM (
 	SELECT station_id
-  		 , zip
- 	FROM new_zips
+  		 , zipcode
+ 	FROM new_zipcodes
 ) selected
 WHERE {weather_stations}.station_id=selected.station_id
 """
