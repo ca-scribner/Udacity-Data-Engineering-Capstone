@@ -1,11 +1,14 @@
 import argparse
-
+import logging
 import psycopg2
 
-from sql_queries import insert_olap_table_queries, drop_olap_table_queries, create_olap_table_queries, \
-    analytical_queries, discardable_query
-from utilities import test_table_has_rows, test_table_has_no_rows, load_settings, Timer
+from sql_queries import analytical_queries, discardable_query
+from utilities import load_settings, Timer, logging_datefmt, logging_format, logging_argparse_kwargs, \
+    logging_argparse_args
 
+logging.basicConfig(format=logging_format,
+                    datefmt=logging_datefmt)
+logger = logging.getLogger(__file__)
 
 DEFAULT_N = 5
 
@@ -22,13 +25,19 @@ def run_analytical_queries(engine, n):
 
     # Discard a query in case there's an initial connect time
     with Timer(enter_message=f"Running a junk query in case there's an initial connect time",
-               exit_message="\t--> junk query done"):
+               exit_message="\t--> junk query done",
+               print_function=logger.info,
+               ):
         cur.execute(discardable_query)
 
     for q_name, q in analytical_queries.items():
-        with Timer(enter_message=f"Running query {q_name} {n} times", exit_message="\t--> batch run done"):
+        with Timer(enter_message=f"Running query {q_name} {n} times", exit_message="\t--> batch run done",
+                   print_function=logger.info,
+                  ):
             for i in range(n):
-                with Timer(exit_message=f"\t--> {i}"):
+                with Timer(exit_message=f"\t--> {i}",
+                           print_function=logger.info,
+                           ):
                     cur.execute(q)
 
 
@@ -45,6 +54,8 @@ def parse_arguments():
         default=DEFAULT_N,
         help=f"Number of runs per query.  Default is {DEFAULT_N}"
     )
+    parser.add_argument(*logging_argparse_args, **logging_argparse_kwargs)
+
     return parser.parse_args()
 
 
@@ -53,6 +64,9 @@ if __name__ == "__main__":
     Test analytical queries on OLAP and OLTP schemas
     """
     args = parse_arguments()
+
+    if args.set_logging_level:
+        logger.setLevel(str(args.set_logging_level).upper())
 
     secrets, data_cfg = load_settings()
 

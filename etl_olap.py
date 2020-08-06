@@ -1,13 +1,11 @@
 import argparse
-import logging
 import psycopg2
 
 from sql_queries import insert_olap_table_queries, drop_olap_table_queries, create_olap_table_queries
-from utilities import test_table_has_rows, test_table_has_no_rows, load_settings, Timer
+from utilities import test_table_has_rows, test_table_has_no_rows, load_settings, Timer, logging_argparse_kwargs, \
+    logging_argparse_args, get_logger
 
-logging.basicConfig(format='%(asctime)20s - %(name)12s - %(funcName)20s() -%(levelname)7s - %(message)s',
-                    datefmt='%Y/%m/%d %H:%M:%S')
-logger = logging.getLogger(__file__)
+logger = get_logger(name=__file__)
 
 
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
@@ -78,15 +76,7 @@ def parse_arguments():
         action="store_true",
         help="If set, will drop/receate the target table before loading.  Useful for debugging"
     )
-    parser.add_argument(
-        '--set_logging_level',
-        action="store",
-        default="info",
-        help="Overrides the default logger print level.  Accepts any valid input for logging.Logger.setLevel(), such as"
-             " info', 'warning', 'error', 'critical', or an integer.  "
-             f"If unset, the default NOTSET value of the logging module is used, which typically sets the print level"
-             f"to 'warning'."
-    )
+    parser.add_argument(*logging_argparse_args, **logging_argparse_kwargs)
     return parser.parse_args()
 
 
