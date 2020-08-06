@@ -12,6 +12,7 @@ staging_population = f"staging_{population}"
 
 olap_sales_weather_population = f"fact_sales_{weather}_{population}"
 olap_monthly_sales_store = f"fact_monthly_sales_store"
+olap_daily_sales_by_category = f"fact_daily_sales_by_category"
 
 count_rows = """
 SELECT COUNT(*) from {table_name}
@@ -32,6 +33,7 @@ drop_weather_stations = drop.format(table_name=weather_stations)
 
 drop_olap_sales_weather_population = drop.format(table_name=olap_sales_weather_population)
 drop_olap_monthly_sales_store = drop.format(table_name=olap_monthly_sales_store)
+drop_olap_daily_sales_by_category = drop.format(table_name=olap_daily_sales_by_category)
 
 drop_staging_sales = drop.format(table_name=staging_sales)
 drop_staging_weather = drop.format(table_name=staging_weather)
@@ -243,6 +245,20 @@ CREATE TABLE {olap_monthly_sales_store} (
 )
 """
 
+olap_daily_sales_by_category_columns = {
+    "date": "DATE NOT NULL",
+    "category_id": "VARCHAR(7) NOT NULL",
+    "total_sale": "DECIMAL(11,3) NOT NULL",
+}
+
+create_olap_daily_sales_by_category = f"""
+CREATE TABLE {olap_daily_sales_by_category} (
+      {", ".join(f"{name} {spec}" for name, spec in olap_daily_sales_by_category_columns.items())},
+  PRIMARY KEY (date, category_id),
+  FOREIGN KEY (category_id) REFERENCES {product_categories}
+)
+"""
+
 load_staging_postgres = """
 SELECT aws_s3.table_import_from_s3(
     '{table_name}',
@@ -418,8 +434,17 @@ SELECT
     inv.store_id,
     SUM(inv.total_sale)
 FROM invoices inv
--- JOIN stores s ON (s.store_id = inv.store_id)
 GROUP BY year, month, inv.store_id
+"""
+
+select_oltp_daily_sales_by_category = f"""
+SELECT
+    inv.date as date,
+    it.category_id as category_id,
+    SUM(inv.total_sale)
+FROM invoices inv
+JOIN items it ON (it.item_id = inv.item_id)
+GROUP BY date, category_id
 """
 
 insert_olap_sales_weather_population = f"""
@@ -431,6 +456,12 @@ INSERT INTO {olap_sales_weather_population} (
 insert_olap_monthly_sales_store = f"""
 INSERT INTO {olap_monthly_sales_store} (
     {select_oltp_monthly_sales_store}
+)
+"""
+
+insert_olap_daily_sales_by_category = f"""
+INSERT INTO {olap_daily_sales_by_category} (
+    {select_oltp_daily_sales_by_category}
 )
 """
 
@@ -453,6 +484,7 @@ create_table_queries = {
 create_olap_table_queries = {
     olap_sales_weather_population: create_olap_sales_weather,
     olap_monthly_sales_store: create_olap_monthly_sales_store,
+    olap_daily_sales_by_category: create_olap_daily_sales_by_category
 }
 
 drop_staging_table_queries = {
@@ -474,6 +506,7 @@ drop_table_queries = {
 drop_olap_table_queries = {
     olap_sales_weather_population: drop_olap_sales_weather_population,
     olap_monthly_sales_store: drop_olap_monthly_sales_store,
+    olap_daily_sales_by_category: drop_olap_daily_sales_by_category,
 }
 
 load_staging_queries_postgres = {
@@ -501,6 +534,7 @@ insert_table_queries_postgres = {
 insert_olap_table_queries = {
     olap_sales_weather_population: insert_olap_sales_weather_population,
     olap_monthly_sales_store: insert_olap_monthly_sales_store,
+    olap_daily_sales_by_category: insert_olap_daily_sales_by_category,
 }
 
 # Other queries
@@ -560,11 +594,20 @@ SELECT
 FROM {olap_monthly_sales_store}
 """
 
+select_olap_daily_sales_by_category = f"""
+SELECT
+    *
+FROM {olap_daily_sales_by_category}
+"""
+
+
 analytical_queries = {
     "OLTP: sales vs weather": select_oltp_sales_weather_population,
     "OLAP: sales vs weather": select_olap_sales_vs_weather,
     "OLTP: monthly sales by store": select_oltp_monthly_sales_store,
     "OLAP: monthly sales by store": select_olap_monthly_sales_store,
+    "OLTP: daily sales by category": select_oltp_daily_sales_by_category,
+    "OLAP: daily sales by category": select_olap_daily_sales_by_category,
 }
 
 # Misc helper queries

@@ -23,6 +23,8 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
     if check_before:
         test_table_has_no_rows(engine, table_name)
 
+    logger.debug(f"query = {query}")
+
     cur = engine.cursor()
     # Insert into table
     cur.execute(query)
@@ -59,9 +61,10 @@ def insert_check_tables(engine):
                enter_message="Loading and checking OLAP tables",
                exit_message="\t--> load and check complete"):
         for table_name, q in insert_olap_table_queries.items():
-            logger.info(f"\tInserting and checking table {table_name}")
-            logger.debug(f"\tq = {q}")
-            load_check_table(engine, table_name, q)
+            with Timer(print_function=logger.info,
+                       enter_message=f"\tLoading {table_name}",
+                       exit_message=f"\t\t--> load {table_name} complete"):
+                    load_check_table(engine, table_name, q)
 
 
 def parse_arguments():
@@ -92,11 +95,13 @@ def drop_load_table(engine):
 
     for name, q in drop_olap_table_queries.items():
         logger.info(f"\tDropping {name}")
-    cur.execute(q)
+        logger.debug(f"\tq = {q}")
+        cur.execute(q)
 
     for name, q in create_olap_table_queries.items():
         logger.info(f"\tCreating {name}")
-    cur.execute(q)
+        logger.debug(f"\tq = {q}")
+        cur.execute(q)
     engine.commit()
 
 

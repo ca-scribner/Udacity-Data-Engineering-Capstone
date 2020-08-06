@@ -23,14 +23,13 @@ def run_analytical_queries(engine, n):
     """
     cur = engine.cursor()
 
-    # Discard a query in case there's an initial connect time
-    with Timer(enter_message=f"Running a junk query in case there's an initial connect time",
-               exit_message="\t--> junk query done",
-               print_function=logger.info,
-               ):
-        cur.execute(discardable_query)
-
     for q_name, q in analytical_queries.items():
+        # Discard a query in case there's an initial connect time
+        with Timer(enter_message=f"Running a junk query in case there's an initial connect time",
+                   exit_message="\t--> junk query done",
+                   print_function=logger.info,
+                   ):
+            cur.execute(discardable_query)
         with Timer(enter_message=f"Running query {q_name} {n} times", exit_message="\t--> batch run done",
                    print_function=logger.info,
                   ):
