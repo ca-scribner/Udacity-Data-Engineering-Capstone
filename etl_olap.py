@@ -1,9 +1,13 @@
 import argparse
-
+import logging
 import psycopg2
 
 from sql_queries import insert_olap_table_queries, drop_olap_table_queries, create_olap_table_queries
 from utilities import test_table_has_rows, test_table_has_no_rows, load_settings, Timer
+
+logging.basicConfig(format='%(asctime)20s - %(name)12s - %(funcName)20s() -%(levelname)7s - %(message)s',
+                    datefmt='%Y/%m/%d %H:%M:%S')
+logger = logging.getLogger(__file__)
 
 
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
@@ -53,8 +57,11 @@ def insert_check_tables(engine):
     Args:
         engine: psycopg2 engine connected to postgres database
     """
-    with Timer(enter_message="Loading and checking OLAP tables", exit_message="\t--> load and check complete"):
+    with Timer(print_function=logger.info,
+               enter_message="Loading and checking OLAP tables",
+               exit_message="\t--> load and check complete"):
         for table_name, q in insert_olap_table_queries.items():
+            logger.debug(f"q = {q}")
             load_check_table(engine, table_name, q)
 
 
@@ -71,6 +78,15 @@ def parse_arguments():
         action="store_true",
         help="If set, will drop/receate the target table before loading.  Useful for debugging"
     )
+    parser.add_argument(
+        '--set_logging_level',
+        action="store",
+        default="info",
+        help="Overrides the default logger print level.  Accepts any valid input for logging.Logger.setLevel(), such as"
+             " info', 'warning', 'error', 'critical', or an integer.  "
+             f"If unset, the default NOTSET value of the logging module is used, which typically sets the print level"
+             f"to 'warning'."
+    )
     return parser.parse_args()
 
 
@@ -84,11 +100,11 @@ def drop_load_table(engine):
     cur = engine.cursor()
 
     for name, q in drop_olap_table_queries.items():
-        print(f"\tDropping {name}")
+        logger.info(f"\tDropping {name}")
     cur.execute(q)
 
     for name, q in create_olap_table_queries.items():
-        print(f"\tCreating {name}")
+        logger.info(f"\tCreating {name}")
     cur.execute(q)
     engine.commit()
 
@@ -98,6 +114,9 @@ if __name__ == "__main__":
     Load OLAP tables from existing OLTP database
     """
     args = parse_arguments()
+
+    if args.set_logging_level:
+        logger.setLevel(str(args.set_logging_level).upper())
 
     secrets, data_cfg = load_settings()
 

@@ -10,7 +10,7 @@ staging_sales = "staging_sales"
 staging_weather = f"staging_{weather}"
 staging_population = f"staging_{population}"
 
-olap_sales_weather = f"fact_{weather}_sales"
+olap_sales_weather_population = f"fact_{weather}_sales"
 
 count_rows = """
 SELECT COUNT(*) from {table_name}
@@ -28,7 +28,7 @@ drop_stores = drop.format(table_name=stores)
 drop_weather = drop.format(table_name=weather)
 drop_weather_stations = drop.format(table_name=weather_stations)
 
-drop_olap_sales_weather = drop.format(table_name=olap_sales_weather)
+drop_olap_sales_weather = drop.format(table_name=olap_sales_weather_population)
 
 drop_staging_sales = drop.format(table_name=staging_sales)
 drop_staging_weather = drop.format(table_name=staging_weather)
@@ -206,7 +206,7 @@ CREATE TABLE {population} (
 """
 
 create_olap_sales_weather = f"""
-CREATE TABLE {olap_sales_weather} (
+CREATE TABLE {olap_sales_weather_population} (
   invoice_id VARCHAR(16) NOT NULL, 
   date DATE NOT NULL, 
   category_id VARCHAR(7) NOT NULL, 
@@ -214,6 +214,7 @@ CREATE TABLE {olap_sales_weather} (
   total_sale DECIMAL(8,3) NOT NULL,
   precipitation DECIMAL(5, 3),
   snowfall DECIMAL(5, 3),
+  population INTEGER, 
   PRIMARY KEY (invoice_id),
   FOREIGN KEY (category_id) REFERENCES {product_categories},
   FOREIGN KEY (store_id) REFERENCES {stores}
@@ -350,7 +351,11 @@ INSERT INTO {population} (
 )
 """
 
-select_oltp_sales_weather = f"""
+select_popoulation_by_year = f"""
+SELECT * FROM {population} WHERE year = {{year}}
+"""
+
+select_oltp_sales_weather_population = f"""
 SELECT 
     t.invoice_id as invoice_id,
     t.date as date,
@@ -358,7 +363,8 @@ SELECT
     t.store_id as store_id,
     t.total_sale as total_sale,
     t.precipitation as precipitation,
-    t.snowfall as snowfall
+    t.snowfall as snowfall,
+    t.population as population
 FROM (
     SELECT 
         inv.invoice_id,
@@ -368,6 +374,7 @@ FROM (
         inv.total_sale,
         w.precipitation,
         w.snowfall,
+        p.population,
         row_number() over (partition by ws.zipcode, inv.invoice_id
                            order by ws.station_id) as rn
     FROM {invoices} inv
@@ -376,14 +383,15 @@ FROM (
     JOIN {product_categories} pc ON (pc.category_id = it.category_id)
     JOIN {weather_stations} ws ON (ws.zipcode = s.zipcode)
     JOIN {weather} w ON w.station_id = ws.station_id AND w.date = inv.date
+    JOIN ({select_popoulation_by_year.format(year=2010)}) p ON p.zipcode = s.zipcode
     ORDER BY ws.zipcode, ws.station_id, inv.invoice_id
 ) t
 WHERE rn = 1
 """
 
 insert_olap_sales_weather = f"""
-INSERT INTO {olap_sales_weather} (
-    {select_oltp_sales_weather}
+INSERT INTO {olap_sales_weather_population} (
+    {select_oltp_sales_weather_population}
     ORDER BY t.invoice_id
 )
 """
@@ -405,7 +413,7 @@ create_table_queries = {
 }
 
 create_olap_table_queries = {
-    olap_sales_weather: create_olap_sales_weather,
+    olap_sales_weather_population: create_olap_sales_weather,
 }
 
 drop_staging_table_queries = {
@@ -425,7 +433,7 @@ drop_table_queries = {
 }
 
 drop_olap_table_queries = {
-    olap_sales_weather: drop_olap_sales_weather,
+    olap_sales_weather_population: drop_olap_sales_weather,
 }
 
 load_staging_queries_postgres = {
@@ -451,7 +459,7 @@ insert_table_queries_postgres = {
 }
 
 insert_olap_table_queries = {
-    olap_sales_weather: insert_olap_sales_weather,
+    olap_sales_weather_population: insert_olap_sales_weather,
 }
 
 # Other queries
@@ -502,11 +510,11 @@ SELECT
     total_sale,
     precipitation,
     snowfall
-FROM {olap_sales_weather}
+FROM {olap_sales_weather_population}
 """
 
 analytical_queries = {
-    "OLTP: sales vs weather": select_oltp_sales_weather,
+    "OLTP: sales vs weather": select_oltp_sales_weather_population,
     "OLAP: sales vs weather": select_olap_sales_vs_weather,
 }
 

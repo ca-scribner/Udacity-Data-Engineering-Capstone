@@ -82,7 +82,7 @@ def load_settings(secrets='secrets.yml', data_cfg='data.yml'):
 
 
 class Timer:
-    def __init__(self, enter_message=None, exit_message=None):
+    def __init__(self, enter_message=None, exit_message=None, print_function=print):
         """
         Construct a simple timer class.
 
@@ -93,6 +93,7 @@ class Timer:
         Args:
             enter_message (str): If used as context manager, this message is printed at enter
             exit_message (str): If used as a context manager, this message is prepended to the context exit message
+            print_function: Function used for printing.  Default is print, but could be a logger.info, etc.
         """
         self.reference_time = None
         self.reset()
@@ -105,6 +106,8 @@ class Timer:
             self.enter_message = None
         else:
             self.enter_message = str(enter_message)
+
+        self.print_function = print_function
 
     def elapsed(self):
         """
@@ -127,9 +130,9 @@ class Timer:
     def __enter__(self):
         self.reset()
         if self.enter_message:
-            print(self.enter_message)
+            self.print_function(self.enter_message)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        print(f"{self.exit_message}Process took {self.elapsed():.1f}s")
+        self.print_function(f"{self.exit_message}Process took {self.elapsed():.1f}s")
 
 
