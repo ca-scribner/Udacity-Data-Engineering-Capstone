@@ -10,7 +10,8 @@ staging_sales = "staging_sales"
 staging_weather = f"staging_{weather}"
 staging_population = f"staging_{population}"
 
-olap_sales_weather_population = f"fact_{weather}_sales"
+olap_sales_weather_population = f"fact_sales_{weather}_{population}"
+olap_monthly_sales_store = f"fact_monthly_sales_store"
 
 count_rows = """
 SELECT COUNT(*) from {table_name}
@@ -20,6 +21,7 @@ drop = """
 DROP TABLE IF EXISTS {table_name}
 """
 
+# Should make drop's auto generate from the list of create queries
 drop_invoices = drop.format(table_name=invoices)
 drop_items = drop.format(table_name=items)
 drop_population = drop.format(table_name=population)
@@ -28,7 +30,8 @@ drop_stores = drop.format(table_name=stores)
 drop_weather = drop.format(table_name=weather)
 drop_weather_stations = drop.format(table_name=weather_stations)
 
-drop_olap_sales_weather = drop.format(table_name=olap_sales_weather_population)
+drop_olap_sales_weather_population = drop.format(table_name=olap_sales_weather_population)
+drop_olap_monthly_sales_store = drop.format(table_name=olap_monthly_sales_store)
 
 drop_staging_sales = drop.format(table_name=staging_sales)
 drop_staging_weather = drop.format(table_name=staging_weather)
@@ -205,18 +208,37 @@ CREATE TABLE {population} (
 )
 """
 
+olap_sales_weather_population_columns = {
+    "invoice_id": "VARCHAR(16) NOT NULL",
+    "date": "DATE NOT NULL",
+    "category_id": "VARCHAR(7) NOT NULL",
+    "store_id": "VARCHAR(4) NOT NULL",
+    "total_sale": "DECIMAL(8,3) NOT NULL",
+    "precipitation": "DECIMAL(5, 3)",
+    "snowfall": "DECIMAL(5, 3)",
+    "population": "INTEGER",
+}
+
 create_olap_sales_weather = f"""
 CREATE TABLE {olap_sales_weather_population} (
-  invoice_id VARCHAR(16) NOT NULL, 
-  date DATE NOT NULL, 
-  category_id VARCHAR(7) NOT NULL, 
-  store_id VARCHAR(4) NOT NULL, 
-  total_sale DECIMAL(8,3) NOT NULL,
-  precipitation DECIMAL(5, 3),
-  snowfall DECIMAL(5, 3),
-  population INTEGER, 
+      {", ".join(f"{name} {spec}" for name, spec in olap_sales_weather_population_columns.items())},
   PRIMARY KEY (invoice_id),
   FOREIGN KEY (category_id) REFERENCES {product_categories},
+  FOREIGN KEY (store_id) REFERENCES {stores}
+)
+"""
+
+olap_monthly_sales_store_columns = {
+    "year": "INTEGER",
+    "month": "INTEGER",
+    "store_id": "VARCHAR(4) NOT NULL",
+    "total_sale": "DECIMAL(11,3) NOT NULL",
+}
+
+create_olap_monthly_sales_store = f"""
+CREATE TABLE {olap_monthly_sales_store} (
+      {", ".join(f"{name} {spec}" for name, spec in olap_monthly_sales_store_columns.items())},
+  PRIMARY KEY (year, month, store_id),
   FOREIGN KEY (store_id) REFERENCES {stores}
 )
 """
@@ -389,10 +411,26 @@ FROM (
 WHERE rn = 1
 """
 
-insert_olap_sales_weather = f"""
+select_oltp_monthly_sales_store = f"""
+SELECT
+    EXTRACT (YEAR FROM inv.date) as year,
+    EXTRACT (MONTH FROM inv.date) as month, 
+    inv.store_id,
+    SUM(inv.total_sale)
+FROM invoices inv
+-- JOIN stores s ON (s.store_id = inv.store_id)
+GROUP BY year, month, inv.store_id
+"""
+
+insert_olap_sales_weather_population = f"""
 INSERT INTO {olap_sales_weather_population} (
     {select_oltp_sales_weather_population}
-    ORDER BY t.invoice_id
+)
+"""
+
+insert_olap_monthly_sales_store = f"""
+INSERT INTO {olap_monthly_sales_store} (
+    {select_oltp_monthly_sales_store}
 )
 """
 
@@ -414,6 +452,7 @@ create_table_queries = {
 
 create_olap_table_queries = {
     olap_sales_weather_population: create_olap_sales_weather,
+    olap_monthly_sales_store: create_olap_monthly_sales_store,
 }
 
 drop_staging_table_queries = {
@@ -426,14 +465,15 @@ drop_table_queries = {
     invoices: drop_invoices,
     stores: drop_stores,
     items: drop_items,
-    product_categories: drop_product_categories, 
+    product_categories: drop_product_categories,
     weather: drop_weather,
     weather_stations: drop_weather_stations,
     population: drop_population,
 }
 
 drop_olap_table_queries = {
-    olap_sales_weather_population: drop_olap_sales_weather,
+    olap_sales_weather_population: drop_olap_sales_weather_population,
+    olap_monthly_sales_store: drop_olap_monthly_sales_store,
 }
 
 load_staging_queries_postgres = {
@@ -449,7 +489,7 @@ load_staging_queries_redshift = {
 }
 
 insert_table_queries_postgres = {
-    product_categories: insert_product_categories, 
+    product_categories: insert_product_categories,
     items: insert_items,
     stores: insert_stores,
     invoices: insert_invoices,
@@ -459,7 +499,8 @@ insert_table_queries_postgres = {
 }
 
 insert_olap_table_queries = {
-    olap_sales_weather_population: insert_olap_sales_weather,
+    olap_sales_weather_population: insert_olap_sales_weather_population,
+    olap_monthly_sales_store: insert_olap_monthly_sales_store,
 }
 
 # Other queries
@@ -513,9 +554,17 @@ SELECT
 FROM {olap_sales_weather_population}
 """
 
+select_olap_monthly_sales_store = f"""
+SELECT
+    *
+FROM {olap_monthly_sales_store}
+"""
+
 analytical_queries = {
     "OLTP: sales vs weather": select_oltp_sales_weather_population,
     "OLAP: sales vs weather": select_olap_sales_vs_weather,
+    "OLTP: monthly sales by store": select_oltp_monthly_sales_store,
+    "OLAP: monthly sales by store": select_olap_monthly_sales_store,
 }
 
 # Misc helper queries

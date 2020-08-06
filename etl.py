@@ -5,7 +5,10 @@ import awswrangler as wr
 
 from sql_queries import insert_table_queries_postgres, get_station_latitude_longitude, insert_station_zipcode, \
     load_staging_queries_postgres, load_staging_queries_redshift
-from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip, load_settings, Timer
+from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_zip, load_settings, Timer, \
+    logging_argparse_kwargs, logging_argparse_args, get_logger
+
+logger = get_logger(name=__file__)
 
 
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
@@ -26,7 +29,7 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
     cur = engine.cursor()
     # Insert into table
     cur.execute(query)
-        
+
     # Check for data in destination table
     if check_after:
         test_table_has_rows(engine, table_name)
@@ -79,13 +82,14 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
         access_key (str): AWS access key that can access S3 data
         secret_ke (str): AWS secret key that can access S3 data
     """
-    print("Loading and checking staging tables")
+    logger.info("Loading and checking staging tables")
 
     # Stage sales
     table_name = "staging_sales"
 
     # Find staging files
-    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\t--> load {table_name} complete"):
+    with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\t--> load {table_name} complete",
+               print_function=logger.info):
         this_data_cfg = data_cfg[data_sources["sales"]][sales_raw_data_type]
         load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
 
@@ -93,7 +97,8 @@ def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="
     for case_name in ["weather", "population"]:
         table_name = f"staging_{case_name}"
         # Load data from all raw files
-        with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\t--> load {table_name} complete"):
+        with Timer(enter_message=f"\tLoading table {table_name}", exit_message=f"\t--> load {table_name} complete",
+                   print_function=logger.info):
             this_data_cfg = data_cfg[data_sources[case_name]]
             load_check_from_s3_prefix(this_data_cfg, db_type, engine, secrets, table_name)
 
@@ -124,7 +129,8 @@ def load_check_from_s3_prefix(data_cfg, db_type, engine, secrets, table_name):
         raise ValueError(f"Found no files to load for {table_name} in {path}")
 
     for file_to_stage in files_to_stage:
-        with Timer(enter_message=f"\t\tstaging file .../{file_to_stage.split('/')[-1]}", exit_message="\t\t--> "):
+        with Timer(enter_message=f"\t\tstaging file .../{file_to_stage.split('/')[-1]}", exit_message="\t\t--> ",
+                   print_function=logger.info):
             q = get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type)
             load_check_table(engine, table_name, q, check_before=False)
 
@@ -138,18 +144,19 @@ def insert_check_tables(engine):
     Args:
         engine: psycopg2 engine connected to postgres database
     """
-    print("Loading and checking production tables")
+    logger.info("Loading and checking production tables")
 
     for table_name, q in insert_table_queries_postgres.items():
-        with Timer(enter_message=f"\tInserting into table {table_name}", exit_message=f"\t--> insert into {table_name} complete"):
+        with Timer(enter_message=f"\tInserting into table {table_name}",
+                   exit_message=f"\t--> insert into {table_name} complete", print_function=logger.debug):
             load_check_table(engine, table_name, q)
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Stage S3 data to Postgres and then insert it into production tables")
     parser.add_argument(
-        '-t', '--test', 
-        action="store_true", 
+        '-t', '--test',
+        action="store_true",
         help="If set, use testing subset data rather than production data"
     )
     parser.add_argument(
@@ -164,6 +171,8 @@ def parse_arguments():
         help="File type to load sales data from.  "
              "Can be 'csv' for postgres, or either of ('csv', 'parquet') for redshift"
     )
+    parser.add_argument(*logging_argparse_args, **logging_argparse_kwargs)
+
     return parser.parse_args()
 
 
@@ -197,6 +206,9 @@ if __name__ == "__main__":
     """
     args = parse_arguments()
 
+    if args.set_logging_level:
+        logger.setLevel(str(args.set_logging_level).upper())
+
     data_sources = {
         'sales': 'sales_raw',
         'weather': 'weather_raw',
@@ -204,7 +216,7 @@ if __name__ == "__main__":
     }
     if args.test:
         data_sources['sales'] = data_sources['sales'] + "_test"
-        
+
     secrets, data_cfg = load_settings()
 
     engine = psycopg2.connect(
@@ -215,7 +227,8 @@ if __name__ == "__main__":
         port=secrets[args.db]["port"],
     )
 
-    with Timer(enter_message="Loading staging tables", exit_message="--> staging table load complete"):
+    with Timer(enter_message="Loading staging tables", exit_message="--> staging table load complete",
+               print_function=logger.info):
         load_check_staging_tables(
             engine,
             data_sources,
@@ -225,9 +238,10 @@ if __name__ == "__main__":
             sales_raw_data_type=args.sales_raw_data_type
         )
 
-    with Timer(enter_message="Inserting data into tables", exit_message="--> table insert complete"):
+    with Timer(enter_message="Inserting data into tables", exit_message="--> table insert complete",
+               print_function=logger.info):
         insert_check_tables(engine)
 
-    with Timer(enter_message="Adding zip code to weather stations table", exit_message="--> add zip complete"):
+    with Timer(enter_message="Adding zip code to weather stations table", exit_message="--> add zip complete",
+               print_function=logger.info):
         add_zip_to_weather_stations(engine)
-

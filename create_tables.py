@@ -5,7 +5,10 @@ import psycopg2
 from sql_queries import create_staging_table_queries, create_table_queries, drop_olap_table_queries, \
     create_olap_table_queries
 from sql_queries import drop_staging_table_queries, drop_table_queries
-from utilities import load_settings, Timer
+from utilities import load_settings, Timer, logging_argparse_kwargs, \
+    logging_argparse_args, get_logger
+
+logger = get_logger(name=__file__)
 
 
 def drop_tables(engine):
@@ -17,20 +20,20 @@ def drop_tables(engine):
     """
     cur = engine.cursor()
     for name, q in drop_staging_table_queries.items():
-        print(f"\tDropping {name}")
+        logger.info(f"\tDropping {name}")
         cur.execute(q)
 
     for name, q in drop_olap_table_queries.items():
-        print(f"\tDropping {name}")
+        logger.info(f"\tDropping {name}")
         cur.execute(q)
 
     for name, q in drop_table_queries.items():
-        print(f"\tDropping {name}")
+        logger.info(f"\tDropping {name}")
         cur.execute(q)
 
     engine.commit()
 
-    
+
 def create_tables(engine):
     """
     Creates all production and staging tables in database
@@ -40,14 +43,15 @@ def create_tables(engine):
     """
     cur = engine.cursor()
     for name, q in create_staging_table_queries.items():
+        logger.info(f"\tCreating {name}")
         cur.execute(q)
 
     for name, q in create_table_queries.items():
-        print(f"\tCreating {name}")
+        logger.info(f"\tCreating {name}")
         cur.execute(q)
 
     for name, q in create_olap_table_queries.items():
-        print(f"\tCreating {name}")
+        logger.info(f"\tCreating {name}")
         cur.execute(q)
     engine.commit()
 
@@ -60,6 +64,8 @@ def parse_arguments():
         default="postgres",
         help="Name of db credentials in secrets.yaml.  Use this to point at different dbs (postgres, redshift, ...)"
     )
+    parser.add_argument(*logging_argparse_args, **logging_argparse_kwargs)
+
     return parser.parse_args()
 
 
@@ -69,10 +75,13 @@ if __name__ == "__main__":
     """
     args = parse_arguments()
 
+    if args.set_logging_level:
+        logger.setLevel(str(args.set_logging_level).upper())
+
     # Get DB/login information
     secrets, _ = load_settings()
 
-    print(f"Connecting to DB {args.db}")
+    logger.info(f"Connecting to DB {args.db}")
     engine = psycopg2.connect(
         database=secrets[args.db]["database"],
         user=secrets[args.db]["user"],
@@ -81,9 +90,9 @@ if __name__ == "__main__":
         port=secrets[args.db]["port"],
     )
 
-    with Timer(enter_message="Dropping existing tables", exit_message="--> drop complete"):
+    with Timer(enter_message="Dropping existing tables", exit_message="--> drop complete", print_function=logger.info):
         drop_tables(engine)
 
-
-    with Timer(enter_message="Creating new tables", exit_message="--> table creation complete"):
+    with Timer(enter_message="Creating new tables", exit_message="--> table creation complete",
+               print_function=logger.info):
         create_tables(engine)

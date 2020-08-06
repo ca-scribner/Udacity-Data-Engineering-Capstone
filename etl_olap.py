@@ -59,7 +59,8 @@ def insert_check_tables(engine):
                enter_message="Loading and checking OLAP tables",
                exit_message="\t--> load and check complete"):
         for table_name, q in insert_olap_table_queries.items():
-            logger.debug(f"q = {q}")
+            logger.info(f"\tInserting and checking table {table_name}")
+            logger.debug(f"\tq = {q}")
             load_check_table(engine, table_name, q)
 
 

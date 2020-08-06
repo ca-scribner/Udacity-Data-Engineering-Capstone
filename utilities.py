@@ -3,7 +3,6 @@ import time
 from uszipcode import SearchEngine
 import yaml
 
-
 # Shared code for logging use
 logging_format = '%(asctime)20s - %(name)12s - %(funcName)20s() -%(levelname)7s - %(message)s'
 logging_datefmt = '%Y/%m/%d %H:%M:%S'
@@ -17,6 +16,7 @@ logging_argparse_kwargs = dict(
          f"If unset, the default NOTSET value of the logging module is used, which typically sets the print level"
          f"to 'warning'."
 )
+
 
 def get_logger(name):
     logging.basicConfig(format=logging_format,
@@ -156,5 +156,3 @@ class Timer:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.print_function(f"{self.exit_message}Process took {self.elapsed():.1f}s")
-
-
