@@ -137,6 +137,7 @@ def load_check_from_s3_prefix(data_cfg, db_type, engine, secrets, table_name):
         with Timer(enter_message=f"\t\tstaging file .../{file_to_stage.split('/')[-1]}", exit_message="\t\t--> ",
                    print_function=logger.info):
             q = get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type)
+            logger.debug(f"\t\t\tquery = {q}")
             load_check_table(engine, table_name, q, check_before=False)
 
 
@@ -231,9 +232,9 @@ if __name__ == "__main__":
         logger.setLevel(str(args.set_logging_level).upper())
 
     data_sources = {
-        'sales': args.sales_data,
-        'weather': args.weather_data,
-        'population': args.population_data,
+        'sales': args.sales_data_spec,
+        'weather': args.weather_data_spec,
+        'population': args.population_data_spec,
     }
 
     secrets, data_cfg = load_settings()

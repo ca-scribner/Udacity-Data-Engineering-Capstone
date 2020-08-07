@@ -21,15 +21,15 @@ def drop_tables(engine):
     cur = engine.cursor()
     for name, q in drop_staging_table_queries.items():
         logger.info(f"\tDropping {name}")
-        cur.execute(q)
+        _execute_query(cur, q)
 
     for name, q in drop_olap_table_queries.items():
         logger.info(f"\tDropping {name}")
-        cur.execute(q)
+        _execute_query(cur, q)
 
     for name, q in drop_table_queries.items():
         logger.info(f"\tDropping {name}")
-        cur.execute(q)
+        _execute_query(cur, q)
 
     engine.commit()
 
@@ -44,16 +44,21 @@ def create_tables(engine):
     cur = engine.cursor()
     for name, q in create_staging_table_queries.items():
         logger.info(f"\tCreating {name}")
-        cur.execute(q)
+        _execute_query(cur, q)
 
     for name, q in create_table_queries.items():
         logger.info(f"\tCreating {name}")
-        cur.execute(q)
+        _execute_query(cur, q)
 
     for name, q in create_olap_table_queries.items():
         logger.info(f"\tCreating {name}")
-        cur.execute(q)
+        _execute_query(cur, q)
     engine.commit()
+
+
+def _execute_query(cur, q):
+    logger.debug(f"\t\tquery = \n{q}")
+    cur.execute(q)
 
 
 def parse_arguments():

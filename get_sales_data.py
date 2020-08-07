@@ -133,6 +133,9 @@ if __name__ == "__main__":
         df['date'] = pd.to_datetime(df['date'], yearfirst=True)
         url_template = f's3://{{bucket}}/{{key_base}}/{start_date.year:02d}/{start_date.month:02d}/{start_date.year:04d}-{start_date.month:02d}{{suffix}}'
 
+        # Order of returned columns is not guaranteed.  Reorder them to be how we originally specified
+        df = df[staging_sales_columns.keys()]
+
         # Save to csv
         if not args.no_csv:
             this_data_cfg = data_cfg[args.data_spec]["csv"]

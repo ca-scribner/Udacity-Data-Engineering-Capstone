@@ -33,6 +33,7 @@ def run_analytical_queries(engine, n):
         with Timer(enter_message=f"Running query {q_name} {n} times", exit_message="\t--> batch run done",
                    print_function=logger.info,
                   ):
+            logger.debug(f"query definition:\n{q}")
             for i in range(n):
                 with Timer(exit_message=f"\t--> {i}",
                            print_function=logger.info,

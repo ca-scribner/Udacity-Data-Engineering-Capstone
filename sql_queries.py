@@ -221,7 +221,7 @@ olap_sales_weather_population_columns = {
     "population": "INTEGER",
 }
 
-create_olap_sales_weather = f"""
+create_olap_sales_weather_population = f"""
 CREATE TABLE {olap_sales_weather_population} (
       {", ".join(f"{name} {spec}" for name, spec in olap_sales_weather_population_columns.items())},
   PRIMARY KEY (invoice_id),
@@ -418,7 +418,6 @@ FROM (
     FROM {invoices} inv
     JOIN {stores} s ON (s.store_id = inv.store_id)
     JOIN {items} it ON (it.item_id = inv.item_id)
-    JOIN {product_categories} pc ON (pc.category_id = it.category_id)
     JOIN {weather_stations} ws ON (ws.zipcode = s.zipcode)
     JOIN {weather} w ON w.station_id = ws.station_id AND w.date = inv.date
     JOIN ({select_popoulation_by_year.format(year=2010)}) p ON p.zipcode = s.zipcode
@@ -484,7 +483,7 @@ create_table_queries = {
 }
 
 create_olap_table_queries = {
-    olap_sales_weather_population: create_olap_sales_weather,
+    olap_sales_weather_population: create_olap_sales_weather_population,
     olap_monthly_sales_store: create_olap_monthly_sales_store,
     olap_daily_sales_by_category: create_olap_daily_sales_by_category
 }
