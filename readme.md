@@ -64,7 +64,11 @@ The same ETL process was applied for both Postgres and Redshift implementations.
  
 # Analytics objectives
 
-TODO
+In general, the objectives here are to flexibly derive insights from the sales, weather, and population data provided.  As an example of these goals, three primary use cases were examined.  These were chosen to investigate different workloads (some spanning the entire database, others aggregating small portions of the data).  The use cases are: 
+
+1. Aggregating sales per category and relating it to weather and population data (for example, how do the per-capita sales of liquor category X compare to category Y on days with high snowfall).
+1. Aggregating monthly sales per store
+1. Aggregating daily sales per category across all stores
 
 # Database Schema
 
@@ -78,15 +82,44 @@ The database centers on a fact table which includes transaction data (`bottle_co
 
 ## OLAP Schemas
 
-The OLAP database has the following schemas:
+To optimize performance for the target workloads, the following OLAP schemas were also investigated. 
 
-![OLAP Database Schema]()
+### Per Category Sales vs Weather and Population
 
-TODO
+This use case spans the entire OLTP, relating product category to weather and population, and is thus expected to benefit significantly from a denormalized OLAP table.  For example, in the OLTP schema relating invoices to weather requires four joins and relating invoices to product categories requires two joins in the opposite direction.  To aggregate per-category sales and compare them to weather and population in the OLTP schema requires five joins.  
+
+An OLAP schema around a single denormalized fact table was investigated as shown below.  This schema would let a user view per-category_id sales vs weather and population without a single join.
+
+![OLAP Sales vs Weather and Population](./images/olap_sales_weather_population.png)
+
+### Daily Sales per Category
+
+This use case requires a single `join` and `group by` to be performed when using the OLTP database directly.  It is expected that an OLAP table could improve on the responsiveness of this query by storing these results.  An example of the schema is shown below. 
+
+![OLAP Daily Sales per Category](./images/olap_daily_sales_by_category.png)
+
+### Monthly Aggregate Sales per Store
+
+This use case is requires no `join`s but does require a `group by` over a large table.  It is expected that the use case could benefit from an aggregation OLAP table that caches the work of the `group by` operation, although perhaps less so than use cases that require many joins.  An example of the schema is shown below. 
+
+![OLAP Monthly Sales per Store](./images/olap_monthly_sales_store.png)
 
 # Table Optimization
 
 TODO?
+**NOTES: make suer you check these for full db**
+
+* add indices for key table/query?  For example:
+    * `explain analyze select * from population order by zipcode;`: 
+        * No index: 260ms
+        * `create index population_ind_zipcode ON population(zipcode);`: 94ms
+        * `create index population_ind_zipcode ON population(zipcode, population);`: 94ms  <-this way we don't need to scan to get population
+    * `olap_fact_sales_weather_population_by_year`:
+        * No index: 17ms
+        * `CREATE INDEX olap_swp_year ON fact_sales_weather_population(EXTRACT (YEAR FROM date));`: 0.06ms
+
+                         
+    ``
 
 This implementation does not use any distribution or sorting within the tables because:
 
