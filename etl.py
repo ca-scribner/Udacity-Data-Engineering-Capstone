@@ -11,6 +11,11 @@ from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_z
 logger = get_logger(name=__file__)
 
 
+DEFAULT_SALES_DATA_SPEC = "sales_raw"
+DEFAULT_WEATHER_DATA_SPEC = "weather_raw"
+DEFAULT_POPULATION_DATA_SPEC = "population_raw"
+
+
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
     """
     Executes a table load query, checking the table is empty before and not after
@@ -155,9 +160,25 @@ def insert_check_tables(engine):
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Stage S3 data to Postgres and then insert it into production tables")
     parser.add_argument(
-        '-t', '--test',
-        action="store_true",
-        help="If set, use testing subset data rather than production data"
+        '--sales_data_spec',
+        action="store",
+        default=DEFAULT_SALES_DATA_SPEC,
+        help=f"Sets the name of the entry from data.yml that specifies how to load raw sales data.  "
+             f"Default is {DEFAULT_SALES_DATA_SPEC}"
+    )
+    parser.add_argument(
+        '--weather_data_spec',
+        action="store",
+        default=DEFAULT_WEATHER_DATA_SPEC,
+        help=f"Sets the name of the entry from data.yml that specifies how to load raw weather data.  "
+             f"Default is {DEFAULT_WEATHER_DATA_SPEC}"
+    )
+    parser.add_argument(
+        '--population_data_spec',
+        action="store",
+        default=DEFAULT_POPULATION_DATA_SPEC,
+        help=f"Sets the name of the entry from data.yml that specifies how to load raw population data.  "
+             f"Default is {DEFAULT_POPULATION_DATA_SPEC}"
     )
     parser.add_argument(
         '--db',
@@ -210,12 +231,10 @@ if __name__ == "__main__":
         logger.setLevel(str(args.set_logging_level).upper())
 
     data_sources = {
-        'sales': 'sales_raw',
-        'weather': 'weather_raw',
-        'population': 'population_raw',
+        'sales': args.sales_data,
+        'weather': args.weather_data,
+        'population': args.population_data,
     }
-    if args.test:
-        data_sources['sales'] = data_sources['sales'] + "_test"
 
     secrets, data_cfg = load_settings()
 

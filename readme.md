@@ -98,6 +98,8 @@ If more detail on the potential data/workflow was known, a distribution strategy
 
 # Repository Contents and Run Instructions
 
+**TODO**: Do APIs match current definition?
+
 Included in the repository are:
 
 * `get_sales_data.py`: Fetches monthly sales data from public API and store in S3

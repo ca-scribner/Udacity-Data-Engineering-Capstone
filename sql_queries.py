@@ -45,7 +45,7 @@ staging_sales_columns = {
     "store_name": "VARCHAR NOT NULL",
     # "address": "VARCHAR NOT NULL",
     # "city": "VARCHAR NOT NULL",
-    "zipcode": "VARCHAR NOT NULL",
+    "zipcode": "VARCHAR",  # Some values are malformed/missing
     # "store_location": "VARCHAR",
     # "county_number": "DECIMAL",
     # "county": "VARCHAR",
@@ -128,7 +128,7 @@ CREATE TABLE {invoices} (
 stores_columns = {
     "store_id": "VARCHAR(4) NOT NULL",
     "store_name": "VARCHAR(50) NOT NULL",
-    "zipcode": "VARCHAR(5) NOT NULL",
+    "zipcode": "VARCHAR(5)",
 }
 
 create_stores = f"""
@@ -427,6 +427,8 @@ FROM (
 WHERE rn = 1
 """
 
+select_oltp_sales_weather_population_for_year = select_oltp_sales_weather_population + " and EXTRACT (YEAR FROM t.date) = {year}"
+
 select_oltp_monthly_sales_store = f"""
 SELECT
     EXTRACT (YEAR FROM inv.date) as year,
@@ -576,7 +578,7 @@ WHERE {weather_stations}.station_id=selected.station_id
 """
 
 # Analytical queries
-select_olap_sales_vs_weather = f"""
+select_olap_sales_weather_population = f"""
 SELECT
     invoice_id,
     date,
@@ -584,9 +586,14 @@ SELECT
     store_id,
     total_sale,
     precipitation,
-    snowfall
+    snowfall,
+    population
 FROM {olap_sales_weather_population}
 """
+
+select_olap_sales_weather_population_for_year = select_olap_sales_weather_population + \
+                                                " WHERE EXTRACT(YEAR from date) = {year}"
+
 
 select_olap_monthly_sales_store = f"""
 SELECT
@@ -602,8 +609,10 @@ FROM {olap_daily_sales_by_category}
 
 
 analytical_queries = {
-    "OLTP: sales vs weather": select_oltp_sales_weather_population,
-    "OLAP: sales vs weather": select_olap_sales_vs_weather,
+    "OLTP: sales vs weather and population": select_oltp_sales_weather_population,
+    "OLAP: sales vs weather and population": select_olap_sales_weather_population,
+    "OLTP: sales vs weather and population (2015)": select_oltp_sales_weather_population_for_year.format(year=2015),
+    "OLAP: sales vs weather and population (2015)": select_olap_sales_weather_population_for_year.format(year=2015),
     "OLTP: monthly sales by store": select_oltp_monthly_sales_store,
     "OLAP: monthly sales by store": select_olap_monthly_sales_store,
     "OLTP: daily sales by category": select_oltp_daily_sales_by_category,
