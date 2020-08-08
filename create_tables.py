@@ -4,7 +4,7 @@ import psycopg2
 import psycopg2.errors
 
 from sql_queries import create_staging_table_queries, create_table_queries, drop_olap_table_queries, \
-    create_olap_table_queries
+    create_olap_table_queries, redshift_diststyle
 from sql_queries import drop_staging_table_queries, drop_table_queries
 from utilities import load_settings, Timer, logging_argparse_kwargs, \
     logging_argparse_args, get_logger
@@ -35,7 +35,7 @@ def drop_tables(engine):
     engine.commit()
 
 
-def create_tables(engine):
+def create_tables(engine, apply_redshift_diststyle):
     """
     Creates all production and staging tables in database
     
@@ -45,14 +45,23 @@ def create_tables(engine):
     cur = engine.cursor()
     for name, q in create_staging_table_queries.items():
         logger.info(f"\tCreating {name}")
+        if apply_redshift_diststyle:
+            # Add a redshift diststyle if one is defined for this table
+            q = q + redshift_diststyle.get(name, "")
         _execute_query(cur, q)
 
     for name, q in create_table_queries.items():
         logger.info(f"\tCreating {name}")
+        if apply_redshift_diststyle:
+            # Add a redshift diststyle if one is defined for this table
+            q = q + redshift_diststyle.get(name, "")
         _execute_query(cur, q)
 
     for name, q in create_olap_table_queries.items():
         logger.info(f"\tCreating {name}")
+        if apply_redshift_diststyle:
+            # Add a redshift diststyle if one is defined for this table
+            q = q + redshift_diststyle.get(name, "")
         _execute_query(cur, q)
     engine.commit()
 
@@ -87,6 +96,8 @@ if __name__ == "__main__":
     # Get DB/login information
     secrets, _ = load_settings()
 
+    apply_redshift_diststyle = secrets[args.db].get("apply_redshift_diststyle", False)
+
     logger.info(f"Connecting to DB {args.db}")
     engine = psycopg2.connect(
         database=secrets[args.db]["database"],
@@ -111,4 +122,4 @@ if __name__ == "__main__":
 
     with Timer(enter_message="Creating new tables", exit_message="--> table creation complete",
                print_function=logger.info):
-        create_tables(engine)
+        create_tables(engine, apply_redshift_diststyle)

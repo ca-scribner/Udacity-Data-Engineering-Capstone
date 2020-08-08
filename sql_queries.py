@@ -622,6 +622,22 @@ analytical_queries = {
     "OLAP: daily sales by category": select_olap_daily_sales_by_category,
 }
 
+redshift_diststyle = {
+    product_categories: " DISTSTYLE ALL",
+    items: " DISTSTYLE ALL",
+    stores: " DISTSTYLE ALL",
+    invoices: "",
+    weather_stations: " DISTSTYLE ALL",
+    weather: " DISTSTYLE ALL",
+    population: " DISTSTYLE ALL",
+    staging_sales: " DISTSTYLE EVEN",
+    staging_weather: " DISTSTYLE EVEN",
+    staging_population: " DISTSTYLE EVEN",
+    olap_sales_weather_population: "",
+    olap_monthly_sales_store: "",
+    olap_daily_sales_by_category: ""
+}
+
 # Misc helper queries
 
 # very simple query used during performance testing to make sure there's no first-query-lag in timing
