@@ -205,7 +205,7 @@ Query performance was timed by rerunning the same queries multiple times and tak
 |                                                          | OLTP     | OLAP     | OLTP     | OLAP     |
 |            Monthly Aggregate Sales per Store             | 35       | 4        | 6        | 5        |
 |                     Daily Sales per Category             | 11       | 10       | 5        | 2        |
-| Per Category Sales vs Weather and Population             | 550      | 145      | 130      | 120      |
+| Per Category Sales vs Weather and Population             | 550      | 145      | 130      | 100      |
 | Per Category Sales vs Weather and Population (2015 only) | 235      | 35       | 73       | 25       |
 
 As expected, the OLAP schema significantly improved analytics for the broad workloads that require multiple joins, whereas it had some effect on the more local workloads.  Redshift was found to outperform Postgres in nearly all workloads, with Postgres being better only for Monthly Aggregate Sales in OLAP (with the difference being ~1s per query).  Redshift appears better suited to the expected workload investigated here, and unless data storage is very restricted OLAP schemas are likely beneficial to use here.
