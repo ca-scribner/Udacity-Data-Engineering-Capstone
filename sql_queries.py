@@ -51,9 +51,9 @@ staging_sales_columns = {
     # "county": "VARCHAR",
     "category_id": "DECIMAL",
     "category_name": "VARCHAR",
-    "vendor_id": "DECIMAL NOT NULL",
+    "vendor_id": "DECIMAL",
     "vendor_name": "VARCHAR NOT NULL",
-    "item_id": "DECIMAL NOT NULL",
+    "item_id": "VARCHAR NOT NULL",
     "item_description": "VARCHAR NOT NULL",
     # "pack": "DECIMAL NOT NULL",
     # "bottle_volume_ml": "DECIMAL NOT NULL",
@@ -108,12 +108,12 @@ CREATE TABLE {staging_population} (
 invoices_columns = {
     "invoice_id": "VARCHAR(16) NOT NULL",
     "store_id": "VARCHAR(4) NOT NULL",
-    "item_id": "VARCHAR(6) NOT NULL",
+    "item_id": "VARCHAR(8) NOT NULL",
     "date": "DATE NOT NULL",
-    "bottle_cost": "DECIMAL(7,3) NOT NULL",
-    "bottle_retail": "DECIMAL(7,3) NOT NULL",
+    "bottle_cost": "DECIMAL(8,3) NOT NULL",
+    "bottle_retail": "DECIMAL(8,3) NOT NULL",
     "bottles_sold": "SMALLINT NOT NULL",
-    "total_sale": "DECIMAL(8,3) NOT NULL",
+    "total_sale": "DECIMAL(9,3) NOT NULL",
 }
 
 create_invoices = f"""
@@ -139,10 +139,10 @@ CREATE TABLE {stores} (
 """
 
 items_columns = {
-    "item_id": "VARCHAR(6) NOT NULL",
+    "item_id": "VARCHAR(8) NOT NULL",
     "item_description": "VARCHAR(70) NOT NULL",
     "category_id": "VARCHAR(7)",
-    "vendor_id": "VARCHAR(3) NOT NULL",
+    "vendor_id": "VARCHAR(3)",
 }
 
 create_items = f"""
@@ -215,7 +215,7 @@ olap_sales_weather_population_columns = {
     "date": "DATE NOT NULL",
     "category_id": "VARCHAR(7) NOT NULL",
     "store_id": "VARCHAR(4) NOT NULL",
-    "total_sale": "DECIMAL(8,3) NOT NULL",
+    "total_sale": "DECIMAL(9,3) NOT NULL",
     "precipitation": "DECIMAL(5, 3)",
     "snowfall": "DECIMAL(5, 3)",
     "population": "INTEGER",
