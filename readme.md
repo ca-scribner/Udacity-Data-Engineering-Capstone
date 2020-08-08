@@ -120,6 +120,13 @@ This use case requires no `join`s but does require a `group by` over a large tab
 
 # Table Optimization
 
+Table optimizations attempted here included:
+
+* Adding distribution styles to Redshift tables (`ALL` for all small dimension tables, `EVEN` for staging tables).  
+
+Staging tables distributed even
+dimensions for olap dist all
+
 TODO?
 **NOTES: make suer you check these for full db**
 
@@ -189,11 +196,11 @@ Included in the repository are:
 The staging of raw data, specifically the many sales data files, in Redshift was notably better performing than in Postgres:
 
 * Postgres:
-    * Staging (~1850s total):
-        * staging of the sales files was progressively slower the larger the staging table became.  Staging the first few month's sales took ~2s, whereas staging the last few months sales took >40s.  The average time to stage a monthly sales file was ~20s 
-        * staging time for other data (population and weather) was small relative to that of sales.  Staging all other data took ~20s total
-    * Insert of staged data into OLTP schema took about 1100s
-    * Insert of OLTP data into OLAP schema took about 700s
+    * Staging (~155s total):
+        * Staging sales files consistently took ~2s per file, with no reduction of performance as the size of staged data grew
+        * staging time for other data (population and weather) was small relative to that of sales.  Staging all other data took ~12s total
+    * Insert of staged data into OLTP schema took about 580s
+    * Insert of OLTP data into OLAP schema took about 460s
 * Redshift:
     * Staging (~180s total)
         * Staging sales files consistently took ~2s per file, with no reduction of performance as the size of staged data grew
@@ -212,20 +219,10 @@ Query performance was timed by rerunning the same queries multiple times and tak
 |                                                          | OLTP     | OLAP     | OLTP     | OLAP     |
 |            Monthly Aggregate Sales per Store             |          |          | 6        | 5        |
 |                     Daily Sales per Category             |          |          | 5        | 2        |
-| Per Category Sales vs Weather and Population             |          |          | 130      | 120      |
-| Per Category Sales vs Weather and Population (2015 only) |          |          | 73       | 25       |
-
-
-### Monthly Aggregate Sales per Store
-### Daily Sales per Category
-### Per Category Sales vs Weather and Population
-
+| Per Category Sales vs Weather and Population             | 550      | 145      | 130      | 120      |
+| Per Category Sales vs Weather and Population (2015 only) | 235      |          | 73       | 25       |
 
 **TODO:**
-
-* Compare between OLTP and OLAP for load and select
-* Compare between pg and rs
-
 
 # Project Questions:
 
@@ -241,14 +238,13 @@ Given the nature of the data sources, the current system need only be updated wh
 
 ### The data was increased by 100x.
 
-The present ETL process (staging all data into a single staging table then selecting the data into the OLTP/OLAP schemas) will not scale 100x.  This process showed problems even in the present study, especially for postgres implementation which had significantly decreasing speed of staging data as the staging table grew.  In the case of 100x scale, it would make more sense to stage the data in chunks (stage file 1, load file 1 into OLTP, stage file 2, load file 2 ...).  This workload would lend itself well to a more formalized data pipeline using airflow.
+The present ETL process (staging all data into a single staging table then selecting the data into the OLTP/OLAP schemas) will not scale 100x.  This process worked but was cumbersome even in the present study, especially for initial postgres implementations that used an undersized compute node that led to significantly decreasing performance for staging data as the staging table grew.  In the case of 100x scale, it is expected that at least the Postgres implementation would have trouble staging that size data at once.  It would make more sense to stage the data in chunks (stage file 1, load file 1 into OLTP; stage file 2, load file 2 into OLTP; ...).  This workload would lend itself well to a more formalized data pipeline using airflow.
 
 In general, Redshift has been designed with scale in mind more than Postgres has.  Although Postgres does have features for scale and parallelism, those features are more core to Redshift's design.  Redshift as a managed service is also easier to scale without interuption (by adding/modifying the nodes).  It is expected that at 100x scale Redshift would perform much better than Postgres for the same workloads.  
 
-Analytics workloads may also be problematic at 100x scale, depending on the type of analytics that were being performance.  Although some analytics may still be feasible, a big data solution such as Spark might serve the needs better.
+Analytics workloads may also be problematic at 100x scale, depending on the type of analytics that were being performance.  Although some analytics may still be feasible, a big data solution such as Spark with distributed data might serve the needs better.  Distributed data with a simple data access layer (such as S3 storage of parquet files with AWS Athena on top) might also suit the needs well, especially if infrequent access is required as Athena provides a serverless solution that would not require always-on managed instances.  
 
-**PARTITIONING**
-**DISTRIBUTED DATA**
+Whether using distributed data or RDS, more focus on partitioning and indexing data would be beneficial at larger scale.  
 
 ### The data populates a dashboard that must be updated on a daily basis by 7am every day.
 
@@ -263,6 +259,8 @@ To support 100+ users (for example many users of a dashboard or many analytics u
 
 # Recommendations and Conclusions
 
-**OLTP vs OLAP**
+In general, the OLTP queries performed well for queries that required few joins (monthly and daily sales queries), but performed poorly for queries that spanned the entire database with multiple joins.  If these broad queries are frequent, the addition of the OLAP schema would be helpful.
 
-The Postgres solution presented here is not well suited to the task at hand.  Additional optimizations to improve ETL and analytical performance may be available, but they would need to be significant to overcome the observed performance deficits versus Redshift.  Redshift performed well for most analytics tasks, but clearly 
+The Redshift solution presented here appears better suited to the task and scale at hand.  Analytics queries, both for OLAP and OLTP, performed better with Redshift than the Postgres implementation.  Additional optimizations to improve the Postgres setup, but they would need to be significant to overcome the observed performance deficits versus Redshift.  
+
+It is also clear that the larger analytics jobs, such as the sales vs weather/population, are not suited to serve a dashboard or fast-response request.  Caching, better indexing/distribution strategies, or additional resources would be required to improve their performance.   
