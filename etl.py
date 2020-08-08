@@ -15,6 +15,10 @@ DEFAULT_SALES_DATA_SPEC = "sales_raw"
 DEFAULT_WEATHER_DATA_SPEC = "weather_raw"
 DEFAULT_POPULATION_DATA_SPEC = "population_raw"
 
+def _execute_query(cur, query):
+    logger.debug(f"query = {query}")
+    cur.execute(query)
+
 
 def load_check_table(engine, table_name, query, check_before=True, check_after=True):
     """
@@ -33,7 +37,7 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
 
     cur = engine.cursor()
     # Insert into table
-    cur.execute(query)
+    _execute_query(cur, query)
 
     # Check for data in destination table
     if check_after:
@@ -137,7 +141,6 @@ def load_check_from_s3_prefix(data_cfg, db_type, engine, secrets, table_name):
         with Timer(enter_message=f"\t\tstaging file .../{file_to_stage.split('/')[-1]}", exit_message="\t\t--> ",
                    print_function=logger.info):
             q = get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type)
-            logger.debug(f"\t\t\tquery = {q}")
             load_check_table(engine, table_name, q, check_before=False)
 
 
@@ -206,7 +209,7 @@ def add_zip_to_weather_stations(engine):
         engine: psycopg2 engine connected to postgres database
     """
     cur = engine.cursor()
-    cur.execute(get_station_latitude_longitude)
+    _execute_query(cur, get_station_latitude_longitude)
     records = cur.fetchall()
 
     search = SearchEngine(simple_zipcode=True)
@@ -218,7 +221,7 @@ def add_zip_to_weather_stations(engine):
 
     insert_query = insert_station_zipcode.format(values=values)
 
-    cur.execute(insert_query)
+    _execute_query(cur, insert_query)
     engine.commit()
 
 

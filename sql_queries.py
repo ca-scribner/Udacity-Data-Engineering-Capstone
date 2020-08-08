@@ -19,7 +19,7 @@ SELECT COUNT(*) from {table_name}
 """
 
 drop = """
-DROP TABLE IF EXISTS {table_name}
+DROP TABLE IF EXISTS {table_name} CASCADE
 """
 
 # Should make drop's auto generate from the list of create queries
@@ -52,7 +52,7 @@ staging_sales_columns = {
     "category_id": "DECIMAL",
     "category_name": "VARCHAR",
     "vendor_id": "DECIMAL",
-    "vendor_name": "VARCHAR NOT NULL",
+    "vendor_name": "VARCHAR",
     "item_id": "VARCHAR NOT NULL",
     "item_description": "VARCHAR NOT NULL",
     # "pack": "DECIMAL NOT NULL",
@@ -378,6 +378,8 @@ INSERT INTO {weather} (
 )
 """
 
+# Use NULLIF to catch blank strings as null.  Postgres does not need this, but without it redshift will not see any
+# null gender fields
 insert_population = f"""
 INSERT INTO {population} (
     SELECT 
@@ -385,7 +387,7 @@ INSERT INTO {population} (
     FROM {staging_population}
     WHERE minimum_age IS NULL
       AND maximum_age IS NULL 
-      AND gender IS NULL
+      AND NULLIF(gender, '') IS NULL
 )
 """
 
@@ -421,6 +423,7 @@ FROM (
     JOIN {weather_stations} ws ON (ws.zipcode = s.zipcode)
     JOIN {weather} w ON w.station_id = ws.station_id AND w.date = inv.date
     JOIN ({select_popoulation_by_year.format(year=2010)}) p ON p.zipcode = s.zipcode
+    WHERE it.category_id IS NOT NULL
     ORDER BY ws.zipcode, ws.station_id, inv.invoice_id
 ) t
 WHERE rn = 1
@@ -445,6 +448,7 @@ SELECT
     SUM(inv.total_sale)
 FROM invoices inv
 JOIN items it ON (it.item_id = inv.item_id)
+WHERE category_id IS NOT NULL
 GROUP BY date, category_id
 """
 
@@ -495,13 +499,13 @@ drop_staging_table_queries = {
 }
 
 drop_table_queries = {
+    population: drop_population,
+    weather: drop_weather,
+    weather_stations: drop_weather_stations,
     invoices: drop_invoices,
     stores: drop_stores,
     items: drop_items,
     product_categories: drop_product_categories,
-    weather: drop_weather,
-    weather_stations: drop_weather_stations,
-    population: drop_population,
 }
 
 drop_olap_table_queries = {
@@ -533,9 +537,9 @@ insert_table_queries_postgres = {
 }
 
 insert_olap_table_queries = {
-    olap_sales_weather_population: insert_olap_sales_weather_population,
     olap_monthly_sales_store: insert_olap_monthly_sales_store,
     olap_daily_sales_by_category: insert_olap_daily_sales_by_category,
+    olap_sales_weather_population: insert_olap_sales_weather_population,
 }
 
 # Other queries
