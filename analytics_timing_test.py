@@ -15,8 +15,8 @@ DEFAULT_N = 5
 
 def run_analytical_queries(engine, n):
     """
-    TODO
-    
+    Runs a suite of analytics queries n times each using the provided engine
+
     Args:
         engine: psycopg2 engine connected to postgres database
         n (int): Number of iterations per query
@@ -32,7 +32,7 @@ def run_analytical_queries(engine, n):
             cur.execute(discardable_query)
         with Timer(enter_message=f"Running query {q_name} {n} times", exit_message="\t--> batch run done",
                    print_function=logger.info,
-                  ):
+                   ):
             logger.debug(f"query definition:\n{q}")
             for i in range(n):
                 with Timer(exit_message=f"\t--> {i}",
@@ -42,7 +42,8 @@ def run_analytical_queries(engine, n):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Stage S3 data to Postgres and then insert it into production tables")
+    parser = argparse.ArgumentParser(description="Runs a test suite of OLAP and OLTP queries on a given database n "
+                                                 "times")
     parser.add_argument(
         '--db',
         action="store",

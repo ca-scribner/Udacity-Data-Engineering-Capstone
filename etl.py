@@ -10,12 +10,15 @@ from utilities import test_table_has_rows, test_table_has_no_rows, lat_long_to_z
 
 logger = get_logger(name=__file__)
 
-
 DEFAULT_SALES_DATA_SPEC = "sales_raw"
 DEFAULT_WEATHER_DATA_SPEC = "weather_raw"
 DEFAULT_POPULATION_DATA_SPEC = "population_raw"
 
+
 def _execute_query(cur, query):
+    """
+    Helper to apply debug printing to queries when required
+    """
     logger.debug(f"query = {query}")
     cur.execute(query)
 
@@ -47,6 +50,19 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
 
 
 def get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type="postgres"):
+    """
+    Populates a query from a template
+
+    Args:
+        table_name (str): Target table name
+        data_cfg (dict): Data spec dictionary
+        file_to_stage (str): Filename to be staged
+        secrets (dict): Secrets for aws, redshift, etc, from config file
+        db_type (str): Database type
+
+    Returns:
+        (str): populated query
+    """
     if file_to_stage.startswith('s3://'):
         # Strip leading s3://{bucket}/
         file_to_stage = "/".join(file_to_stage.lstrip("s3://").split("/")[1:])
@@ -73,23 +89,18 @@ def get_load_query(table_name, data_cfg, file_to_stage, secrets, db_type="postgr
     return q.format(**q_settings)
 
 
-# TODO: REMAKE DOCSTRING
-# (engine, bucket, key, region, source_format, access_key, secret_key):
 def load_check_staging_tables(engine, data_sources, data_cfg, secrets, db_type="postgres", sales_raw_data_type="csv", ):
     """
-    TODO: REDO THIS DOCSTRING
-    Loads all staging tables from S3 source
+    Loads and performs validity checks on all staging tables from S3 source
     
-    Includes checks to ensure tables are empty before load and have content after load
+    Checks ensure tables are empty before load and have content after load
     
     Args:
         engine: psycopg2 engine connected to postgres database
-        bucket (str): AWS S3 bucket for source data
-        key (str): AWS S3 key for source data
-        region (str): AWS S3 region for source data
-        source_format (str): Postgres copy command formatted source file format string.  For example: "(FORMAT CSV, HEADER TRUE)"
-        access_key (str): AWS access key that can access S3 data
-        secret_ke (str): AWS secret key that can access S3 data
+        data_sources (dict): Map of {'data_source_name': data_spec}
+        secrets (dict): Dictionary of db/aws secrets
+        db_type (str): postgres or redshift
+        sales_raw_data_type (str): file type of raw sales data.  csv or parquet
     """
     logger.info("Loading and checking staging tables")
 
@@ -116,17 +127,12 @@ def load_check_from_s3_prefix(data_cfg, db_type, engine, secrets, table_name):
     """
     Checks if a staging table is empty then loads data from one or more files specified by an S3 location
 
-    TODO: docstrong
-
     Args:
-        data_cfg:
-        db_type:
-        engine:
-        secrets:
-        table_name:
-
-    Returns:
-
+        data_cfg (dict): Data spec dictionary
+        db_type (str): postgres or redshift
+        engine: psycopg2 engine connected to postgres database
+        secrets (dict): Dictionary of db/aws secrets
+        table_name (str): Name of the destination table
     """
     # Check the staging table is empty before loading
     test_table_has_no_rows(engine, table_name)
@@ -162,7 +168,8 @@ def insert_check_tables(engine):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Stage S3 data to Postgres and then insert it into production tables")
+    parser = argparse.ArgumentParser(
+        description="Stage S3 data to a database and then insert it into production tables")
     parser.add_argument(
         '--sales_data_spec',
         action="store",
@@ -227,7 +234,7 @@ def add_zip_to_weather_stations(engine):
 
 if __name__ == "__main__":
     """
-    Stage S3 data to Postgres and then insert it into production tables
+    Stage S3 data to a database then insert it into production tables
     """
     args = parse_arguments()
 

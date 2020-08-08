@@ -47,7 +47,7 @@ def test_table_has_rows(engine, table_name):
 
 def test_table_has_no_rows(engine, table_name):
     """
-    Test whether a table has any rows, raising a ValueError if it does not
+    Test whether a table has no rows, raising a ValueError if it does not
 
     Args:
         engine: psycopg2 engine connected to a database

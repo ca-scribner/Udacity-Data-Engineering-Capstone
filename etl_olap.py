@@ -28,15 +28,18 @@ def load_check_table(engine, table_name, query, check_before=True, check_after=T
     cur = engine.cursor()
     # Insert into table
     cur.execute(query)
-        
+
     # Check for data in destination table
     if check_after:
         test_table_has_rows(engine, table_name)
 
     engine.commit()
 
-    
+
 def populate_query(q, data_cfg, secrets):
+    """
+    Helper function to populate a query given a template, data spec, and secrets
+    """
     q_settings = dict(
         source_format=data_cfg["source_format"],
         bucket=data_cfg["bucket"],
@@ -64,11 +67,11 @@ def insert_check_tables(engine):
             with Timer(print_function=logger.info,
                        enter_message=f"\tLoading {table_name}",
                        exit_message=f"\t\t--> load {table_name} complete"):
-                    load_check_table(engine, table_name, q)
+                load_check_table(engine, table_name, q)
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Stage S3 data to Postgres and then insert it into production tables")
+    parser = argparse.ArgumentParser(description="Load OLAP tables from existing OLTP database")
     parser.add_argument(
         '--db',
         action="store",

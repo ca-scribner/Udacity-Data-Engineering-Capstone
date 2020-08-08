@@ -6,9 +6,7 @@ import awswrangler as wr
 from utilities import load_settings, Timer
 from sql_queries import staging_sales_columns
 
-
 DEFAULT_LIMIT = 1000000
-
 
 # Map between the names used in this app and the original data source names
 SALES_NAME_MAP_APP_TO_SOURCE = {
@@ -39,6 +37,7 @@ SALES_NAME_MAP_APP_TO_SOURCE = {
 }
 
 SALES_NAME_MAP_SOURCE_TO_APP = {v: k for k, v in SALES_NAME_MAP_APP_TO_SOURCE.items()}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Gets Iowa Liquor Sales data from API and stores to a bucket as "
@@ -118,7 +117,7 @@ if __name__ == "__main__":
                                         order="date",
                                         where=where,
                                         limit=limit,
-                                 )
+                                        )
 
         # Catch if we maxed our return limit
         if len(results) == limit:
@@ -170,6 +169,6 @@ if __name__ == "__main__":
                     path=output_url,
                     s3_additional_kwargs=s3_additional_kwargs,
                     # compression=this_data_cfd["compression"],  # psycopg2 does not support copy redshift from
-                                                                 # compressed parquet
+                    # compressed parquet
                     index=False,  # Do not export empty index column
                 )

@@ -626,7 +626,7 @@ redshift_diststyle = {
     product_categories: " DISTSTYLE ALL",
     items: " DISTSTYLE ALL",
     stores: " DISTSTYLE ALL",
-    invoices: "",
+    invoices: " distkey(store_id)",
     weather_stations: " DISTSTYLE ALL",
     weather: " DISTSTYLE ALL",
     population: " DISTSTYLE ALL",

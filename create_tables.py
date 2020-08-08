@@ -1,6 +1,5 @@
 import argparse
 
-import psycopg2
 import psycopg2.errors
 
 from sql_queries import create_staging_table_queries, create_table_queries, drop_olap_table_queries, \
@@ -41,32 +40,27 @@ def create_tables(engine, apply_redshift_diststyle):
     
     Args:
         engine: psycopg2 engine connected to postgres database
+        apply_redshift_diststyle (bool): If True, adds distribution styles to all create statements
     """
     cur = engine.cursor()
-    for name, q in create_staging_table_queries.items():
-        logger.info(f"\tCreating {name}")
-        if apply_redshift_diststyle:
-            # Add a redshift diststyle if one is defined for this table
-            q = q + redshift_diststyle.get(name, "")
-        _execute_query(cur, q)
+    for query_collection in [create_staging_table_queries.items(),
+                             create_table_queries.items(),
+                             create_olap_table_queries.items()]:
 
-    for name, q in create_table_queries.items():
-        logger.info(f"\tCreating {name}")
-        if apply_redshift_diststyle:
-            # Add a redshift diststyle if one is defined for this table
-            q = q + redshift_diststyle.get(name, "")
-        _execute_query(cur, q)
+        for name, q in query_collection:
+            logger.info(f"\tCreating {name}")
+            if apply_redshift_diststyle:
+                # Add a redshift diststyle if one is defined for this table
+                q = q + redshift_diststyle.get(name, "")
+            _execute_query(cur, q)
 
-    for name, q in create_olap_table_queries.items():
-        logger.info(f"\tCreating {name}")
-        if apply_redshift_diststyle:
-            # Add a redshift diststyle if one is defined for this table
-            q = q + redshift_diststyle.get(name, "")
-        _execute_query(cur, q)
     engine.commit()
 
 
 def _execute_query(cur, q):
+    """
+    Helper to apply debug printing to queries when required
+    """
     logger.debug(f"\t\tquery = \n{q}")
     cur.execute(q)
 
@@ -110,6 +104,7 @@ if __name__ == "__main__":
     with Timer(enter_message="Dropping existing tables", exit_message="--> drop complete", print_function=logger.info):
         drop_tables(engine)
 
+    # Apply additional DB setup commands if required
     if "setup_commands" in secrets[args.db]:
         logger.info("Running setup queries")
         for q in secrets[args.db]["setup_commands"]:
