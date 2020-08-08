@@ -1,13 +1,7 @@
 psycopg2
 pyyaml
 uszipcode
-# smart_open[aws]
-# fastparquet
 awswrangler
-
-# Dev only?
 pandas
 csvkit
-
-# Iowa data download only
 sodapy
