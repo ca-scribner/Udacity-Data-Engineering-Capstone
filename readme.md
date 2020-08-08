@@ -2,19 +2,17 @@
 
 # Project: Data Warehouse
 
-This project explores the use of AWS' managed Postgres and Redshift database services using [Iowa liquor sales data](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy) joined with [NOAA weather data](https://www.ncdc.noaa.gov/cdo-web/).  The objectives are to better understand how these two offerings behave for both OLTP (regularly loading new data into a source of truth database) and OLAP (extracting insights that may span multiple tables) workflows.  In general, the objectives with this data are to derive insights regarding the liquor sales data, such as investigating monthly liquor sales by store or the relation between liquor sales and weather patterns (such as snowfall and rainfall).  In particular, this will be explored from the perspective of a user who needs to support both a source of truth (must have access to in-sync data, although this access need not be fully performant and could be infrequent) and analytics workflows (such as for a dashboard or machine learning use cases).
+This project explores the use of AWS' managed Postgres and Redshift database services with the objective of better understanding how they both behave for OLTP (regularly loading new data into a source of truth database) and OLAP (extracting insights that may span multiple tables) workflows, and how table structure affects overall productivity.  This is examined using [Iowa liquor sales data](https://data.iowa.gov/Sales-Distribution/Iowa-Liquor-Sales/m3tr-qhgy) joined with [NOAA weather data](https://www.ncdc.noaa.gov/cdo-web/) and [US population data](https://www.kaggle.com/census/us-population-by-zip-code), where a few sample use cases are examined, such as investigating monthly liquor sales by store or the relation between liquor sales and weather patterns (such as snowfall and rainfall).  In particular, this will be explored from the perspective of two users, one who needs a source of truth (must have access to in-sync data, although this access need not be fully performant and could be infrequent) and one who needs analytics workflows (such as for a dashboard or machine learning use cases).
 
-TO ADD: 
-* explore and assess data, before schema?
+# Data Sources and Exploration
 
-# Source Data
+The data used here are:
 
-The source data used here are:
+* Iowa Liquor Sales
+* National Oceanic and Atmospheric Administration weather data
+* US census data for population
 
-* Iowa Liquor Sales:
-* National Oceanic and Atmospheric Administration weather data:
-
-The exploration of these datasets is described below
+The exploration of these datasets is described below.
 
 ## Iowa Liquor Sales:
 
@@ -30,7 +28,7 @@ Key data fields include:
 * category name: <50 character text field that contains nulls
 * bottle cost, bottle retail, and total sale value: numeric and may contain nulls.  Staged as text to avoid rounding and to allow their final destination to choose precision
 
-The staged raw CSV and parquet data are hosted publicly in `udacity-de-capstone-182/raw-data/sales/`.
+The staged raw CSV and parquet data are hosted publicly in `s3://udacity-de-capstone-182/raw-data/sales/`.
 
 Note also that some fields which have ID and name components (for example, category id and category name) do not necessarily have the same unique counts.  Their definitions have changed over time (for example, Category ABC might be renamed to Category XYZ, but still use the same ID=1).  Because of this the strategy used here is to resolve any conflicts between ID and name by using the most recent naming convention from the raw data (for example, if in 2012 Category 1 had name ABC but in 2018 Category 1 had name XYZ, we use XYZ).
 
@@ -45,7 +43,22 @@ Key data fields include:
 * daily precipitation: decimal value, may contain nulls
 * daily snowfall: decimal value, may contain nulls
 
-The staged raw CSV data is hosted publicly in `udacity-de-capstone-182/raw-data/weather/`.
+The staged raw CSV data is hosted publicly in `s3://udacity-de-capstone-182/raw-data/weather/`.
+
+## US Census Data for Population
+
+[US population data](https://www.kaggle.com/census/us-population-by-zip-code) was obtained from the US census via Kaggle and includes.  This dataset includes total population by zipcode, as well as broken down by zip code and demographics (age groups and gender).  Files were obtained for the 2000 and 2010 census, although currently only 2010 population is used.
+
+Key data fields include:
+* zipcode: 5 digit ID and does not contain nulls
+* population: integer number of persons in the zip code and does not contain nulls
+* other demographics, which here were used simply to filter for total population in an area
+
+The staged raw CSV data is hosted publicly in `s3://udacity-de-capstone-182/raw-data/population/`.
+
+# Database Infrastructure
+
+Managed Postgres and Redshift implementations from AWS were examined here.  As they're provisioned differently (Redshift is managed on a set of nodes, whereas Postgres is essentially managed on a provisioned EC2 node), the choice was made to compare two solutions that have roughly the same monthly cost.  A single dc2.large node for Redshift is compared here to a db.m5.xlarge node for Postgres.
 
 # ETL Strategy
 
@@ -53,6 +66,7 @@ The same ETL process was applied for both Postgres and Redshift implementations.
 
 * Store raw data:
     * (by human interaction): Transfer NOAA Iowa weather data for 2012-2018 to AWS S3, stored as yearly CSV files
+    * (by human interaction): Transfer US population data for 2000 and 2010 to AWS S3, stored as yearly CSV files
     * (`get_sales_data.py`): Collect Iowa Liquor Sales data from Socrata API and transfer to AWS S3, grabbed and stored as monthly CSV and parquet files
 * Stage raw data in staging tables:
     * (`create_tables.py`): (Drop and) Create all staging, OLTP, and OLAP tables
@@ -64,7 +78,7 @@ The same ETL process was applied for both Postgres and Redshift implementations.
  
 # Analytics objectives
 
-In general, the objectives here are to flexibly derive insights from the sales, weather, and population data provided.  As an example of these goals, three primary use cases were examined.  These were chosen to investigate different workloads (some spanning the entire database, others aggregating small portions of the data).  The use cases are: 
+In general, the objectives of the analytical workflow here are to flexibly derive insights from the sales, weather, and population data provided.  As an example of these goals, three primary use cases were examined.  These were chosen to investigate different workloads (from spanning the entire database to aggregating smaller portions of the data).  The use cases are: 
 
 1. Aggregating sales per category and relating it to weather and population data (for example, how do the per-capita sales of liquor category X compare to category Y on days with high snowfall).
 1. Aggregating monthly sales per store
@@ -78,7 +92,7 @@ The OLTP database had the following schema:
 
 ![OLTP Database Schema](./images/oltp.png)
 
-The database centers on a fact table which includes transaction data (`bottle_cost`, `total_sale`) and references to other tables for store and item details.  The goal here is a Third Normal Form schema with no redundancy, but this causes complications when trying to relate properties like an item category with the store that sells it as they require multiple joins.  In the case of aggregating liquor sales by category and comparing to weather data, five joins are required.
+The database centers on a the invoice table which includes transaction data (`bottle_cost`, `total_sale`) and references to other tables for store and item details.  The goal here is a Third Normal Form schema with no redundancy, but this causes complications when trying to relate properties like an item category with the store that sells it as they require multiple joins.  In the case of aggregating liquor sales by category and comparing to weather data, five joins are required.
 
 ## OLAP Schemas
 
@@ -86,9 +100,9 @@ To optimize performance for the target workloads, the following OLAP schemas wer
 
 ### Per Category Sales vs Weather and Population
 
-This use case spans the entire OLTP, relating product category to weather and population, and is thus expected to benefit significantly from a denormalized OLAP table.  For example, in the OLTP schema relating invoices to weather requires four joins and relating invoices to product categories requires two joins in the opposite direction.  To aggregate per-category sales and compare them to weather and population in the OLTP schema requires five joins.  
+This use case spans the entire OLTP schema, relating product category to weather and population, and is thus expected to benefit significantly from a denormalized OLAP table which reduces the `join` workload.  For example, in the OLTP schema relating invoices to weather requires four joins and relating invoices to product categories requires two joins in the opposite direction.  To aggregate per-category sales and compare them to weather and population in the OLTP schema requires five joins.  
 
-An OLAP schema around a single denormalized fact table was investigated as shown below.  This schema would let a user view per-category_id sales vs weather and population without a single join.
+An OLAP schema around a single denormalized fact table was investigated as shown below.  This schema would let a user view per-category_id sales vs weather and population without a single join, and minimal additional joins for the normalized columns such as category_name or store_name.
 
 ![OLAP Sales vs Weather and Population](./images/olap_sales_weather_population.png)
 
@@ -100,7 +114,7 @@ This use case requires a single `join` and `group by` to be performed when using
 
 ### Monthly Aggregate Sales per Store
 
-This use case is requires no `join`s but does require a `group by` over a large table.  It is expected that the use case could benefit from an aggregation OLAP table that caches the work of the `group by` operation, although perhaps less so than use cases that require many joins.  An example of the schema is shown below. 
+This use case requires no `join`s but does require a `group by` over a large table.  It is expected that the use case could benefit from an aggregation OLAP table that caches the work of the `group by` operation, although perhaps less so than use cases that require many joins.  An example of the schema is shown below. 
 
 ![OLAP Monthly Sales per Store](./images/olap_monthly_sales_store.png)
 
@@ -117,21 +131,11 @@ TODO?
     * `olap_fact_sales_weather_population_by_year`:
         * No index: 17ms
         * `CREATE INDEX olap_swp_year ON fact_sales_weather_population(EXTRACT (YEAR FROM date));`: 0.06ms
-
-                         
     ``
 
-This implementation does not use any distribution or sorting within the tables because:
-
-the desired analytical workload was not specified. Depending on the desired workload, setting a distribution strategy for the songplay table that is focused on the primary actions might be adventageous.
-as we are examining a subset of the data, the distribution of the real data is unclear. The balance between number of records of users vs artists appears to be different from what we'd expect in practice.
-Without foreknowledge about the workflow and data, Redshift's default optimization is a good option.
-
-If more detail on the potential data/workflow was known, a distribution strategy might be available that co-locates commonly joined information. For example, assuming the songplay and user tables are both expected to be large and often joined, while the song, and artist tables are expected to be small (and edited less often), it could make sense to distribute the songplay and user tables by key with user_id and the song and artist tables by all. Similarly, sorting could be defined based on expected workloads.
+**TODO: SEE THIS IN OTHER REPORTS**
 
 # Repository Contents and Run Instructions
-
-**TODO**: Do APIs match current definition?
 
 Included in the repository are:
 
@@ -158,6 +162,8 @@ Included in the repository are:
         port:
         user:
         password:
+        setup_commands:
+        - CREATE EXTENSION aws_s3 CASCADE
     
     aws:
         access_key:
@@ -176,20 +182,56 @@ Included in the repository are:
         secret_key:
     ````
 
-# Analytics Comparisons
+# Discussion on Performance
+
+## ETL Performance
+
+The staging of raw data, specifically the many sales data files, in Redshift was notably better performing than in Postgres:
+
+* Postgres:
+    * Staging (~1850s total):
+        * staging of the sales files was progressively slower the larger the staging table became.  Staging the first few month's sales took ~2s, whereas staging the last few months sales took >40s.  The average time to stage a monthly sales file was ~20s 
+        * staging time for other data (population and weather) was small relative to that of sales.  Staging all other data took ~20s total
+    * Insert of staged data into OLTP schema took about 1100s
+    * Insert of OLTP data into OLAP schema took about 700s
+* Redshift:
+    * Staging (~180s total)
+        * Staging sales files consistently took ~2s per file, with no reduction of performance as the size of staged data grew
+        * Staging other files took ~20s total.
+    * Insert of staged data into OLTP schema took about 70s
+    * Insert of OLTP data into OLAP schema took about 20s total (mostly for the large weather/population/sales table)
+
+**TODO: COmment**
+
+## Analytics Performance
+
+Query performance was timed by rerunning the same queries multiple times and taking the average.  Throughout the tests there was significant variation - average values are shown here.
+
+|                                                          | Postgres | Postgres | Redshift | Redshift |
+|---------------------------------------------------------:|---------:|---------:|----------|----------|
+|                                                          | OLTP     | OLAP     | OLTP     | OLAP     |
+|            Monthly Aggregate Sales per Store             |          |          | 6        | 5        |
+|                     Daily Sales per Category             |          |          | 5        | 2        |
+| Per Category Sales vs Weather and Population             |          |          | 130      | 120      |
+| Per Category Sales vs Weather and Population (2015 only) |          |          | 73       | 25       |
+
+
+### Monthly Aggregate Sales per Store
+### Daily Sales per Category
+### Per Category Sales vs Weather and Population
+
+
+**TODO:**
 
 * Compare between OLTP and OLAP for load and select
 * Compare between pg and rs
 
-# Comparison between Postgres and Redshift
-s
-(for this use case)
 
 # Project Questions:
 
 ## Clearly state the rationale for the choice of tools and technologies for the project.
 
-TODO
+The database tools were chosen here to compare two similar but different managed database solutions that could be loaded using a similar ETL and support transactional and analytics queries.  Redshift and Postgres were chosen because the scale of the data was modest (large enough to need structured storage and access, but not large enough to require a big data solution like Spark for most analytic workloads), and because qualitatively they should have different strengths and weaknesses (for example, Redshift is columnar and well suited for analytics at scale whereas postgres is row-oriented and may work better in OLTP workloads).
 
 ## Propose how often the data should be updated and why.
 
@@ -197,20 +239,30 @@ Given the nature of the data sources, the current system need only be updated wh
 
 ## Write a description of how you would approach the problem differently under the following scenarios:
 
-TODO
-
 ### The data was increased by 100x.
 
-TODO
+The present ETL process (staging all data into a single staging table then selecting the data into the OLTP/OLAP schemas) will not scale 100x.  This process showed problems even in the present study, especially for postgres implementation which had significantly decreasing speed of staging data as the staging table grew.  In the case of 100x scale, it would make more sense to stage the data in chunks (stage file 1, load file 1 into OLTP, stage file 2, load file 2 ...).  This workload would lend itself well to a more formalized data pipeline using airflow.
+
+In general, Redshift has been designed with scale in mind more than Postgres has.  Although Postgres does have features for scale and parallelism, those features are more core to Redshift's design.  Redshift as a managed service is also easier to scale without interuption (by adding/modifying the nodes).  It is expected that at 100x scale Redshift would perform much better than Postgres for the same workloads.  
+
+Analytics workloads may also be problematic at 100x scale, depending on the type of analytics that were being performance.  Although some analytics may still be feasible, a big data solution such as Spark might serve the needs better.
+
+**PARTITIONING**
+**DISTRIBUTED DATA**
 
 ### The data populates a dashboard that must be updated on a daily basis by 7am every day.
 
-TODO
+Regularly scheduled workloads such as this would benefit from using Airflow or other orchestration tools as they could manage the scheduled and time-sensitive nature of this sort of work.  For most dashboard support (queries that select a few columns but many rows) it is expected that Redshift would be better suited than Postgres as it is columnar in nature.
 
 ### The database needed to be accessed by 100+ people.
 
-TODO
+To support 100+ users (for example many users of a dashboard or many analytics users requiring data access), a horizontally scaling solution would be beneficial.  Some possibile solutions are: 
+
+* Scaling a Redshift solution to multiple nodes.  This may be suitable depending on the scale, and could benefit from data replication (multiple nodes have the same data, reducing bottlenecks)
+* Using a more distributed data storage solution, such as a data access layer (for example Spark or Amazon Athena) on top of files in S3 storage (parquet, compressed csv, etc.).  This would also be well suited for less structured data.  
 
 # Recommendations and Conclusions
 
-TODO:
+**OLTP vs OLAP**
+
+The Postgres solution presented here is not well suited to the task at hand.  Additional optimizations to improve ETL and analytical performance may be available, but they would need to be significant to overcome the observed performance deficits versus Redshift.  Redshift performed well for most analytics tasks, but clearly 
