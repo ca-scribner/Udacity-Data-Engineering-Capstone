@@ -1,6 +1,7 @@
 import argparse
 
 import psycopg2
+import psycopg2.errors
 
 from sql_queries import create_staging_table_queries, create_table_queries, drop_olap_table_queries, \
     create_olap_table_queries
@@ -97,6 +98,16 @@ if __name__ == "__main__":
 
     with Timer(enter_message="Dropping existing tables", exit_message="--> drop complete", print_function=logger.info):
         drop_tables(engine)
+
+    if "setup_commands" in secrets[args.db]:
+        logger.info("Running setup queries")
+        for q in secrets[args.db]["setup_commands"]:
+            logger.debug(f"\tSetup query = {q}")
+            try:
+                engine.cursor().execute(q)
+            except psycopg2.errors.DuplicateObject as e:
+                logger.debug("\tquery already loaded.  Rolling back and continuing")
+                engine.rollback()
 
     with Timer(enter_message="Creating new tables", exit_message="--> table creation complete",
                print_function=logger.info):
