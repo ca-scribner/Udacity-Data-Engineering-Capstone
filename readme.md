@@ -122,25 +122,11 @@ This use case requires no `join`s but does require a `group by` over a large tab
 
 Table optimizations attempted here included:
 
-* Adding distribution styles to Redshift tables (`ALL` for all small dimension tables, `EVEN` for staging tables).  
+* Adding distribution styles to Redshift tables (`ALL` for all small dimension tables, `EVEN` for staging tables, and by key for invoices)
+* Distributing data in an OLAP schema
+* Using indexing
 
-Staging tables distributed even
-dimensions for olap dist all
-
-TODO?
-**NOTES: make suer you check these for full db**
-
-* add indices for key table/query?  For example:
-    * `explain analyze select * from population order by zipcode;`: 
-        * No index: 260ms
-        * `create index population_ind_zipcode ON population(zipcode);`: 94ms
-        * `create index population_ind_zipcode ON population(zipcode, population);`: 94ms  <-this way we don't need to scan to get population
-    * `olap_fact_sales_weather_population_by_year`:
-        * No index: 17ms
-        * `CREATE INDEX olap_swp_year ON fact_sales_weather_population(EXTRACT (YEAR FROM date));`: 0.06ms
-    ``
-
-**TODO: SEE THIS IN OTHER REPORTS**
+In general these optimizations made only small improvements.  This is believed in part to be due to how the analytics queries examined here span multiple tables, but likely better optimization strategies would have yielded better results.
 
 # Repository Contents and Run Instructions
 
@@ -208,7 +194,7 @@ The staging of raw data, specifically the many sales data files, in Redshift was
     * Insert of staged data into OLTP schema took about 70s
     * Insert of OLTP data into OLAP schema took about 20s total (mostly for the large weather/population/sales table)
 
-**TODO: COmment**
+In general, Redshift outperformed Postgres in the primary ETL tasks.  If ETL was frequently performed (new files arriving hourly), this would be of considerable importance, but given the current case is analyzing static data that rarely changes the differences are not as notable.
 
 ## Analytics Performance
 
@@ -217,12 +203,12 @@ Query performance was timed by rerunning the same queries multiple times and tak
 |                                                          | Postgres | Postgres | Redshift | Redshift |
 |---------------------------------------------------------:|---------:|---------:|----------|----------|
 |                                                          | OLTP     | OLAP     | OLTP     | OLAP     |
-|            Monthly Aggregate Sales per Store             |          |          | 6        | 5        |
-|                     Daily Sales per Category             |          |          | 5        | 2        |
+|            Monthly Aggregate Sales per Store             | 35       | 4        | 6        | 5        |
+|                     Daily Sales per Category             | 11       | 10       | 5        | 2        |
 | Per Category Sales vs Weather and Population             | 550      | 145      | 130      | 120      |
-| Per Category Sales vs Weather and Population (2015 only) | 235      |          | 73       | 25       |
+| Per Category Sales vs Weather and Population (2015 only) | 235      | 35       | 73       | 25       |
 
-**TODO:**
+As expected, the OLAP schema significantly improved analytics for the broad workloads that require multiple joins, whereas it had some effect on the more local workloads.  Redshift was found to outperform Postgres in nearly all workloads, with Postgres being better only for Monthly Aggregate Sales in OLAP (with the difference being ~1s per query).  Redshift appears better suited to the expected workload investigated here, and unless data storage is very restricted OLAP schemas are likely beneficial to use here.
 
 # Project Questions:
 
@@ -246,6 +232,8 @@ Analytics workloads may also be problematic at 100x scale, depending on the type
 
 Whether using distributed data or RDS, more focus on partitioning and indexing data would be beneficial at larger scale.  
 
+As a brief investigation into storage strategires that might scale, the present data was loaded into S3 storage (parquet for sales data, csv for other data) and AWS Athena was used to query with similar workloads.  It was found that for queries like the monthly aggregated sales, Athena was able to query that result from the raw data files faster (~3s) than either Postgres or Redshift OLAP tables.  
+
 ### The data populates a dashboard that must be updated on a daily basis by 7am every day.
 
 Regularly scheduled workloads such as this would benefit from using Airflow or other orchestration tools as they could manage the scheduled and time-sensitive nature of this sort of work.  For most dashboard support (queries that select a few columns but many rows) it is expected that Redshift would be better suited than Postgres as it is columnar in nature.
@@ -261,6 +249,6 @@ To support 100+ users (for example many users of a dashboard or many analytics u
 
 In general, the OLTP queries performed well for queries that required few joins (monthly and daily sales queries), but performed poorly for queries that spanned the entire database with multiple joins.  If these broad queries are frequent, the addition of the OLAP schema would be helpful.
 
-The Redshift solution presented here appears better suited to the task and scale at hand.  Analytics queries, both for OLAP and OLTP, performed better with Redshift than the Postgres implementation.  Additional optimizations to improve the Postgres setup, but they would need to be significant to overcome the observed performance deficits versus Redshift.  
+The Redshift solution presented here appears better suited to the task and scale at hand.  Analytics queries, both for OLAP and OLTP, performed better with Redshift than the Postgres implementation.  Additional optimizations to improve the Postgres setup, but they would need to be significant to overcome the observed performance deficits versus Redshift.  The ETL performance for Redshift was better than the Postgres implementation.
 
 It is also clear that the larger analytics jobs, such as the sales vs weather/population, are not suited to serve a dashboard or fast-response request.  Caching, better indexing/distribution strategies, or additional resources would be required to improve their performance.   
