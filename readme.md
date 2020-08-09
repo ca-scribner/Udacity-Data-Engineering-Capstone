@@ -76,7 +76,7 @@ The same ETL process was applied for both Postgres and Redshift implementations.
     * (`etl.py`): Enrich weather station data by adding zip code, computed using the `uszipcode` zip code search engine
 * (`etl.py`): Copy OLTP data to OLAP schemas:
  
-# Analytics objectives
+# Analytics Objectives
 
 In general, the objectives of the analytical workflow here are to flexibly derive insights from the sales, weather, and population data provided.  As an example of these goals, three primary use cases were examined.  These were chosen to investigate different workloads (from spanning the entire database to aggregating smaller portions of the data).  The use cases are: 
 
